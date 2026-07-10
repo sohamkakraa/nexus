@@ -72,11 +72,11 @@ Nexus discovers models available to the connected API account and classifies the
 
 ## Distribution status
 
-As of July 10, 2026, the repository has only been packaged locally as a macOS
-arm64 `.app`. There is no published DMG, signed Windows installer, Linux package,
-or compatible stable entry in the website release manifest yet. The download
-experience therefore links to release status instead of inventing an installer
-URL.
+As of July 10, 2026, local verification has produced an unsigned macOS arm64
+`.app`, DMG, and ZIP. There is no signed or published DMG, Windows installer,
+Linux package, or compatible stable entry in the website release manifest yet.
+The download experience therefore links to release status instead of inventing
+an installer URL.
 
 The signed-tag workflow is configured to build macOS, Windows, and Linux for
 arm64 and x64, validate a versioned release manifest, generate checksums and an

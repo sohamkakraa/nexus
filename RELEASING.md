@@ -2,10 +2,10 @@
 
 ## Current status
 
-The current local artifact is a macOS arm64 `Nexus.app`. No DMG or public
-cross-platform installer has been produced from this branch. The committed
-website manifest therefore has `"release": null`, and the website falls back to
-GitHub Releases.
+Local verification has produced unsigned macOS arm64 `Nexus.app`, DMG, and ZIP
+artifacts. No signed or public cross-platform installer has been produced from
+this branch. The committed website manifest therefore has `"release": null`,
+and the website falls back to GitHub Releases.
 
 ## Release contract
 
