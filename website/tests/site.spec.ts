@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const routes = ["/", "/docs", "/security", "/privacy", "/changelog", "/community", "/legal"];
+const routes = ["/", "/download", "/docs", "/security", "/privacy", "/changelog", "/community", "/legal"];
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -31,11 +31,11 @@ test("publishes every launch page with semantic landmarks", async ({ page }) => 
   }
 });
 
-test("explains the source-only release without a dead installer link", async ({ page }) => {
+test("explains installer status without a dead binary link", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Source open. Signed build pending." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Build the source beta" })).toHaveAttribute("href", "/docs#getting-started");
-  await expect(page.locator('a[href$=".dmg"]')).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Source open. Public installers pending." })).toBeVisible();
+  await expect(page.getByTestId("release-fallback").first()).toHaveAttribute("href", "https://github.com/sohamkakraa/nexus/releases");
+  await expect(page.locator('a[href$=".dmg"], a[href$=".exe"], a[href$=".AppImage"]')).toHaveCount(0);
 });
 
 test("has no serious automated accessibility violations", async ({ page }, testInfo) => {

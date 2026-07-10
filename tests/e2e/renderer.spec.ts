@@ -51,7 +51,7 @@ test('novice BYOK invitation explains Council and local history', async () => {
     await expect(harness.page.getByRole('heading', { name: 'Set the table.' })).toBeVisible()
     await expect(harness.page.getByLabel('Two model perspectives converge into one synthesis')).toBeVisible()
     await expect(harness.page.getByRole('button', { name: 'Connect models' })).toBeVisible()
-    await harness.page.getByText('Stored on this Mac').click()
+    await harness.page.getByText('Stored on this device').click()
     await expect(harness.page.getByText(/Work history and permissions stay local/)).toBeVisible()
     await harness.page.getByRole('button', { name: 'Connect models' }).click()
     await expect(harness.page.getByRole('heading', { name: 'Connections' })).toBeVisible()

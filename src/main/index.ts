@@ -54,6 +54,7 @@ const developmentRendererUrl = !app.isPackaged
   && isSafeDevelopmentUrl(process.env.ELECTRON_RENDERER_URL)
   ? process.env.ELECTRON_RENDERER_URL
   : undefined
+const restoreConfiguredProviders = app.isPackaged || process.env.NEXUS_DISABLE_PROVIDER_RESTORE !== '1'
 if (!app.isPackaged && process.env.NEXUS_USER_DATA_DIR) app.setPath('userData', process.env.NEXUS_USER_DATA_DIR)
 
 async function snapshot(): Promise<AppSnapshot> {
@@ -119,7 +120,7 @@ function registerIpc(): void {
     const now = new Date().toISOString()
     const conversation: Conversation = { id: nanoid(), title: 'New conversation', mode, createdAt: now, updatedAt: now, messages: [] }
     insertConversation(conversation)
-    await broadcastSnapshot()
+    void broadcastSnapshot().catch(() => diagnostic('snapshot-broadcast-failed', { source: 'conversation-create' }))
     return conversation
   })
   handleTrusted('chat:send', async (event, rawRequest: unknown) => {
@@ -295,18 +296,22 @@ app.whenReady().then(async () => {
   openDatabase()
   await applyHistoryRetention()
   registerIpc()
-  void configuredProviders().then((providers) => {
-    providers.forEach((provider) => configuredProviderIds.add(provider))
-    return broadcastSnapshot()
-  }).catch((error) => diagnostic('provider-key-discovery-failed', {
-    message: error instanceof Error ? error.message : String(error)
-  }))
+  if (restoreConfiguredProviders) {
+    void configuredProviders().then((providers) => {
+      providers.forEach((provider) => configuredProviderIds.add(provider))
+      return broadcastSnapshot()
+    }).catch((error) => diagnostic('provider-key-discovery-failed', {
+      message: error instanceof Error ? error.message : String(error)
+    }))
+  }
   configureJobNotifications(() => void broadcastSnapshot())
   configureSessionSecurity()
   await createWindow()
-  void restoreProviderModels()
-    .then(() => broadcastSnapshot())
-    .catch(() => diagnostic('provider-model-restore-failed'))
+  if (restoreConfiguredProviders) {
+    void restoreProviderModels()
+      .then(() => broadcastSnapshot())
+      .catch(() => diagnostic('provider-model-restore-failed'))
+  }
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) void createWindow() })
 })
 
