@@ -1,0 +1,122 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "description": "A local-first AI council for macOS",
+  "private": true,
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run website:lint && npm run website:typecheck && npm run website:build",
+    "site:dev": "npm --prefix website run dev",
+    "website:lint": "npm --prefix website run lint",
+    "website:typecheck": "npm --prefix website run typecheck",
+    "website:build": "npm --prefix website run build",
+    "sbom": "npm sbom --sbom-format cyclonedx > nexus-sbom.cdx.json",
+    "postinstall": "electron-builder install-app-deps",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "keywords": [
+    "ai",
+    "anthropic",
+    "openai",
+    "electron",
+    "mcp"
+  ],
+  "author": "Soham Kakra",
+  "license": "MIT",
+  "homepage": "https://nexus.sohamkakra.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sohamkakraa/nexus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sohamkakraa/nexus/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "build": {
+    "appId": "com.nexus.desktop",
+    "productName": "Nexus",
+    "artifactName": "Nexus-${version}-${arch}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Nexus uses the microphone only during voice sessions you start.",
+        "NSAppleEventsUsageDescription": "Nexus uses Apple Events only for system actions you explicitly approve."
+      }
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.11.1",
+    "clsx": "^2.1.1",
+    "file-type": "^22.0.1",
+    "keytar": "^7.9.0",
+    "lucide-react": "^1.24.0",
+    "mammoth": "^1.12.0",
+    "nanoid": "^5.1.16",
+    "openai": "^6.46.0",
+    "p-queue": "^9.3.1",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "playwright": "^1.61.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.63.0",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}

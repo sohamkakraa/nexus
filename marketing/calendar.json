@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "timezone": "UTC",
+  "paidSpendUsd": 0,
+  "maximumPostsPerWeek": 3,
+  "requiresHumanApproval": true,
+  "campaigns": [
+    {
+      "week": 1,
+      "theme": "Build trust",
+      "assets": ["source-beta", "security-architecture", "privacy-boundaries"],
+      "channels": ["maintainer-owned social accounts", "GitHub"]
+    },
+    {
+      "week": 2,
+      "theme": "Show the work",
+      "assets": ["council-demo", "permission-prompt", "research-citations"],
+      "channels": ["maintainer-owned social accounts", "permitted technical communities"]
+    },
+    {
+      "week": 3,
+      "theme": "Invite review",
+      "assets": ["threat-model", "accessibility-results", "contributor-call"],
+      "channels": ["GitHub", "maintainer-owned social accounts"]
+    },
+    {
+      "week": 4,
+      "theme": "Report honestly",
+      "assets": ["changelog", "public-platform-metrics", "contributor-highlights"],
+      "channels": ["GitHub", "maintainer-owned social accounts"]
+    }
+  ],
+  "prohibited": [
+    "paid spend",
+    "automatic posting without account-owner approval",
+    "unsolicited bulk messages",
+    "fake engagement",
+    "fabricated testimonials or metrics",
+    "platform scraping"
+  ]
+}

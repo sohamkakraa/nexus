@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible Nexus problem
+title: "[Bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, prompts, private files, recordings, or exploitable security details.
+  - type: input
+    id: version
+    attributes: { label: Nexus version, placeholder: "0.1.0" }
+    validations: { required: true }
+  - type: input
+    id: macos
+    attributes: { label: macOS and hardware, placeholder: "macOS 15.5, M2" }
+    validations: { required: true }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Onboarding, Council chat, Files, Voice, Research, MCP, CLI/macOS controls, Website, Packaging]
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Reproduction, description: List the smallest reliable set of steps. }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected and actual behavior }
+    validations: { required: true }
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials and private content from this report.
+          required: true

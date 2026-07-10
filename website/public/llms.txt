@@ -1,0 +1,28 @@
+# Nexus
+
+> Nexus is an MIT-licensed, local-first macOS desktop application that lets OpenAI and Anthropic models draft independently, critique concrete conflicts, and produce one answer.
+
+Canonical site: https://nexus.sohamkakra.com
+Source: https://github.com/sohamkakraa/nexus
+License: MIT
+Current status: 0.1.0 public source beta. No signed or notarized installer is currently claimed.
+
+## Primary documentation
+
+- [Getting started](https://nexus.sohamkakra.com/docs): source build requirements, provider setup, Council mode, permissions, local data controls, and verification.
+- [Security](https://nexus.sohamkakra.com/security): Keychain, Electron IPC, Chromium permissions, command and MCP boundaries, data lifecycle, and reporting.
+- [Privacy](https://nexus.sohamkakra.com/privacy): local desktop data, provider requests, feedback packages, and website hosting.
+- [Changelog](https://nexus.sohamkakra.com/changelog): release and artifact status.
+- [Community](https://nexus.sohamkakra.com/community): contribution, support, conduct, and safe automation rules.
+- [Legal](https://nexus.sohamkakra.com/legal): licensing, third-party services, responsible use, and trademarks.
+
+## Factual product boundaries
+
+- Provider API keys are stored in macOS Keychain.
+- The website does not receive API keys or prompts.
+- Desktop conversations and imported files are local by default.
+- Selected content is sent directly to user-configured AI providers and approved MCP servers.
+- Optional personalization and feedback packaging are off by default and inspectable.
+- Commands and MCP actions require explicit approval and operate within constrained environments.
+- Nexus has no subscription; provider usage may incur charges billed by those providers.
+- The project does not claim independent security audit, Apple notarization, or a production installer at this stage.
