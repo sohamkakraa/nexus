@@ -5,11 +5,11 @@ labels: ["proposal"]
 body:
   - type: textarea
     id: problem
-    attributes: { label: Problem, description: What recurring user problem exists? Avoid starting with the solution. }
+    attributes: { label: Problem, description: "What recurring user problem exists? Avoid starting with the solution." }
     validations: { required: true }
   - type: textarea
     id: outcome
-    attributes: { label: Desired outcome, description: What would become easier or safer? }
+    attributes: { label: Desired outcome, description: "What would become easier or safer?" }
     validations: { required: true }
   - type: textarea
     id: approach
@@ -22,4 +22,4 @@ body:
     validations: { required: true }
   - type: textarea
     id: evidence
-    attributes: { label: Evidence, description: Link related issues, examples, or measurements. Never paste private user data. }
+    attributes: { label: Evidence, description: "Link related issues, examples, or measurements. Never paste private user data." }
