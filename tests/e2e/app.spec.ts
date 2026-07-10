@@ -11,7 +11,8 @@ test('opens the production Electron Council workspace', async () => {
     ...(executablePath ? { executablePath, args: [] } : { args: ['.'] }),
     env: {
       ...Object.fromEntries(Object.entries(safeEnvironment).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
-      NEXUS_USER_DATA_DIR: userData
+      NEXUS_USER_DATA_DIR: userData,
+      NEXUS_DISABLE_PROVIDER_RESTORE: '1'
     }
   })
   try {
@@ -24,7 +25,7 @@ test('opens the production Electron Council workspace', async () => {
       await expect(page.getByRole('heading', { name: /Set(?:ting)? the table/ })).toBeVisible()
       await page.getByRole('button', { name: 'Connections' }).click()
       await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
-      await expect(page.getByText(/Keys are stored in macOS Keychain/)).toBeVisible()
+      await expect(page.getByText(/Connecting checks the provider/)).toBeVisible()
       await page.getByRole('button', { name: 'Close connections' }).click()
     })
     await test.step('create work through the trusted preload', async () => {

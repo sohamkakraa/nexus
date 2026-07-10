@@ -14,7 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
-    "test:website:e2e": "playwright test --config playwright.website.config.ts",
+    "test:website:e2e": "npm --prefix website run test:e2e",
     "check": "npm run lint && npm run typecheck && npm test && npm run manifest:validate && npm run build && npm run website:lint && npm run website:typecheck && npm run website:build",
     "site:dev": "npm --prefix website run dev",
     "website:lint": "npm --prefix website run lint",
