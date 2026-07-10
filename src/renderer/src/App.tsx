@@ -4,7 +4,7 @@ import {
   Mic, Moon, Paperclip, Plus, Send, Settings2, ShieldCheck, Sparkles, Sun, Users,
   Wrench, X
 } from 'lucide-react'
-import type { AppSnapshot, Attachment, Conversation, NexusApi, ProviderId } from '../../shared/contracts'
+import type { AppSnapshot, Attachment, Conversation, NexusApi } from '../../shared/contracts'
 import { ContextInspector } from './components/ContextInspector'
 import { CallPanel, CommandPalette, Connections, WorkflowEditor } from './components/Dialogs'
 import { NexusMark } from './components/NexusMark'
@@ -335,11 +335,6 @@ function LoadingWorkspace(): React.JSX.Element {
 
 function LoadFailure({ message, onRetry }: { message: string; onRetry: () => void }): React.JSX.Element {
   return <div className="state-surface failure-state" role="alert"><p className="eyebrow">Workspace unavailable</p><h2>Local data could not be opened.</h2><p>{message}</p><button className="primary-action" onClick={onRetry}>Try again</button></div>
-}
-
-function providerOf(model: string): ProviderId | '' {
-  if (!model) return ''
-  return model.toLowerCase().includes('claude') ? 'anthropic' : 'openai'
 }
 
 function messageOf(reason: unknown): string {
