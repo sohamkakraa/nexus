@@ -32,3 +32,11 @@ detection happens locally and is not posted to a detection endpoint or analytics
 The site has no prompt API, provider secrets, authentication, analytics SDK, or
 client API keys. Production metadata is canonical to
 `https://nexus.sohamkakra.com`.
+
+## DNS status
+
+The production deployment is available at
+`https://nexus-swart-three.vercel.app`. The custom hostname remains blocked at
+the DNS provider until Cloudflare publishes the recommended
+`A nexus.sohamkakra.com 76.76.21.21` record (or delegates the domain to Vercel
+nameservers).
