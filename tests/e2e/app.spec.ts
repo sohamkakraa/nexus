@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-test('onboards into a Council conversation', async () => {
+test('opens the production Electron Council workspace', async () => {
   const userData = await mkdtemp(join(tmpdir(), 'nexus-e2e-'))
   const { ELECTRON_RUN_AS_NODE: _ignored, ...safeEnvironment } = process.env
   const executablePath = process.env.NEXUS_EXECUTABLE
@@ -21,13 +21,13 @@ test('onboards into a Council conversation', async () => {
       await expect(page.getByTestId('app')).toBeVisible()
     })
     await test.step('inspect provider onboarding', async () => {
-      const onboarding = page.getByRole('heading', { name: 'Connect your models' })
-      if (!(await onboarding.isVisible())) await page.getByRole('button', { name: 'Connections' }).click()
-      await expect(onboarding).toBeVisible()
-      await page.getByRole('button', { name: 'Close', exact: true }).click()
-      await expect(page.getByRole('heading', { name: 'Bring the difficult part.' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /Set(?:ting)? the table/ })).toBeVisible()
+      await page.getByRole('button', { name: 'Connections' }).click()
+      await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
+      await expect(page.getByText(/Keys are stored in macOS Keychain/)).toBeVisible()
+      await page.getByRole('button', { name: 'Close connections' }).click()
     })
-    await test.step('create a Council thread', async () => {
+    await test.step('create work through the trusted preload', async () => {
       const outcome = await page.evaluate(async () => {
         const api = (window as unknown as { nexus: { createConversation(mode: string): Promise<{ id: string }> } }).nexus
         return Promise.race([
@@ -37,7 +37,13 @@ test('onboards into a Council conversation', async () => {
       })
       if (!outcome.startsWith('created:')) throw new Error(`Conversation IPC ${outcome}`)
       await expect(page.getByRole('heading', { name: 'New conversation' })).toBeVisible()
-      await expect(page.getByText('Council', { exact: true })).toBeVisible()
+    })
+    await test.step('prepare a Council workflow without provider calls', async () => {
+      await page.getByRole('button', { name: /New work item/ }).click()
+      await expect(page.getByRole('heading', { name: 'Choose a working method' })).toBeVisible()
+      await page.getByRole('button', { name: /Council decision/ }).click()
+      await expect(page.getByRole('textbox', { name: 'Working brief' })).toHaveValue(/Decision to make/)
+      await expect(page.getByRole('button', { name: /Send brief/ })).toBeDisabled()
     })
   } finally {
     await app.close()
