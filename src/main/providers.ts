@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import type { Attachment, Model, ProviderId } from '../shared/contracts'
+import { curateProviderModels } from '../shared/models'
+import { ProviderConnectionError, providerConnectionError } from '../shared/provider-errors'
 import { attachmentPayload } from './files'
-import { getProviderKey } from './secrets'
+import { getProviderKey, removeProviderKey } from './secrets'
 
 export type GenerateOptions = {
   model: string
@@ -12,23 +14,22 @@ export type GenerateOptions = {
   signal?: AbortSignal
 }
 
-export async function discoverProviderModels(provider: ProviderId): Promise<Model[]> {
-  const key = await requireKey(provider)
-  if (provider === 'openai') {
-    const response = await new OpenAI({ apiKey: key }).models.list()
-    return response.data
-      .map((entry) => toModel('openai', entry.id))
-      .filter((model) => model.capabilities.length > 0)
-      .sort(sortModels)
-  }
-  const client = new Anthropic({ apiKey: key })
-  const page = await client.models.list({ limit: 100 })
-  return page.data.map((entry) => toModel('anthropic', entry.id)).sort(sortModels)
+export async function discoverProviderModels(provider: ProviderId, candidateKey?: string): Promise<Model[]> {
+  const key = candidateKey ?? await requireKey(provider)
+  return providerRequest(provider, async () => {
+    const ids = provider === 'openai'
+      ? (await new OpenAI({ apiKey: key }).models.list()).data.map((entry) => entry.id)
+      : (await new Anthropic({ apiKey: key }).models.list({ limit: 100 })).data.map((entry) => entry.id)
+    return curateProviderModels(provider, ids)
+  }, candidateKey === undefined)
 }
 
 export async function generate(provider: ProviderId, options: GenerateOptions): Promise<string> {
   const key = await requireKey(provider)
-  return provider === 'openai' ? generateOpenAI(key, options) : generateAnthropic(key, options)
+  return providerRequest(
+    provider,
+    () => provider === 'openai' ? generateOpenAI(key, options) : generateAnthropic(key, options)
+  )
 }
 
 export async function generateStreaming(
@@ -42,43 +43,47 @@ export async function generateStreaming(
     return complete
   }
   const key = await requireKey(provider)
-  if (provider === 'openai') {
-    const stream = await new OpenAI({ apiKey: key }).responses.stream({
+  return providerRequest(provider, async () => {
+    if (provider === 'openai') {
+      const stream = await new OpenAI({ apiKey: key }).responses.stream({
+        model: options.model,
+        instructions: options.system,
+        input: options.prompt
+      }, { signal: options.signal })
+      let complete = ''
+      for await (const event of stream) {
+        if (event.type === 'response.output_text.delta') {
+          complete += event.delta
+          onDelta(event.delta)
+        }
+      }
+      return complete.trim()
+    }
+    const stream = new Anthropic({ apiKey: key }).messages.stream({
       model: options.model,
-      instructions: options.system,
-      input: options.prompt
+      max_tokens: 4096,
+      system: options.system,
+      messages: [{ role: 'user', content: options.prompt }]
     }, { signal: options.signal })
     let complete = ''
-    for await (const event of stream) {
-      if (event.type === 'response.output_text.delta') {
-        complete += event.delta
-        onDelta(event.delta)
-      }
-    }
+    stream.on('text', (text) => {
+      complete += text
+      onDelta(text)
+    })
+    await stream.finalMessage()
     return complete.trim()
-  }
-  const stream = new Anthropic({ apiKey: key }).messages.stream({
-    model: options.model,
-    max_tokens: 4096,
-    system: options.system,
-    messages: [{ role: 'user', content: options.prompt }]
-  }, { signal: options.signal })
-  let complete = ''
-  stream.on('text', (text) => {
-    complete += text
-    onDelta(text)
   })
-  await stream.finalMessage()
-  return complete.trim()
 }
 
 export async function createImage(prompt: string, model: string): Promise<string> {
   const key = await requireKey('openai')
-  const response = await new OpenAI({ apiKey: key }).images.generate({
-    model,
-    prompt,
-    size: '1024x1024'
-  })
+  const response = await providerRequest('openai', () =>
+    new OpenAI({ apiKey: key }).images.generate({
+      model,
+      prompt,
+      size: '1024x1024'
+    })
+  )
   const image = response.data?.[0]
   if (!image) throw new Error('The image model returned no image.')
   if (image.b64_json) return `data:image/png;base64,${image.b64_json}`
@@ -99,42 +104,56 @@ export async function createImage(prompt: string, model: string): Promise<string
 export async function transcribe(path: string, model: string): Promise<string> {
   const { createReadStream } = await import('node:fs')
   const key = await requireKey('openai')
-  const result = await new OpenAI({ apiKey: key }).audio.transcriptions.create({
-    file: createReadStream(path),
-    model
-  })
+  const result = await providerRequest('openai', () =>
+    new OpenAI({ apiKey: key }).audio.transcriptions.create({
+      file: createReadStream(path),
+      model
+    })
+  )
   return result.text
 }
 
-export async function research(query: string, depth: 'quick' | 'deep' | 'auto', signal?: AbortSignal): Promise<string> {
+export async function research(
+  query: string,
+  depth: 'quick' | 'deep' | 'auto',
+  model: string,
+  signal?: AbortSignal
+): Promise<string> {
   const key = await requireKey('openai')
-  const model = depth === 'deep' ? 'o4-mini-deep-research' : 'gpt-5.4'
   const boundedSignal = signal
     ? AbortSignal.any([signal, AbortSignal.timeout(depth === 'deep' ? 10 * 60_000 : 3 * 60_000)])
     : AbortSignal.timeout(depth === 'deep' ? 10 * 60_000 : 3 * 60_000)
-  const response = await new OpenAI({ apiKey: key }).responses.create({
-    model,
-    input: `Research this question and produce a concise report with inline source citations and a Sources section: ${query}`,
-    tools: [{ type: 'web_search' }],
-    reasoning: { summary: 'auto' },
-    max_output_tokens: depth === 'deep' ? 8_000 : 3_000,
-    max_tool_calls: depth === 'deep' ? 12 : depth === 'auto' ? 8 : 4
-  } as never, { signal: boundedSignal })
+  const response = await providerRequest('openai', () =>
+    new OpenAI({ apiKey: key }).responses.create({
+      model,
+      input: `${depth === 'quick' ? 'Quickly research' : 'Research'} this question and produce a concise report with inline source citations and a Sources section: ${query}`,
+      tools: [{ type: 'web_search' }],
+      reasoning: { summary: 'auto' },
+      max_output_tokens: depth === 'deep' ? 8_000 : 3_000,
+      max_tool_calls: depth === 'deep' ? 12 : depth === 'auto' ? 8 : 4
+    } as never, { signal: boundedSignal })
+  )
   return response.output_text.trim()
 }
 
 export async function createRealtimeSession(model: string): Promise<{ clientSecret: string; model: string }> {
   const key = await requireKey('openai')
-  const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session: { type: 'realtime', model } })
+  return providerRequest('openai', async () => {
+    const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: { type: 'realtime', model } })
+    })
+    const payload = await response.json() as { value?: string; client_secret?: { value?: string }; error?: { message?: string } }
+    if (!response.ok) {
+      const error = new Error(payload.error?.message ?? 'Realtime session failed.')
+      Object.assign(error, { status: response.status })
+      throw error
+    }
+    const clientSecret = payload.value ?? payload.client_secret?.value
+    if (!clientSecret) throw new Error('The realtime service returned no client secret.')
+    return { clientSecret, model }
   })
-  const payload = await response.json() as { value?: string; client_secret?: { value?: string }; error?: { message?: string } }
-  if (!response.ok) throw new Error(payload.error?.message ?? 'Could not start the realtime session.')
-  const clientSecret = payload.value ?? payload.client_secret?.value
-  if (!clientSecret) throw new Error('The realtime service returned no client secret.')
-  return { clientSecret, model }
 }
 
 async function generateOpenAI(key: string, options: GenerateOptions): Promise<string> {
@@ -181,24 +200,25 @@ async function generateAnthropic(key: string, options: GenerateOptions): Promise
 
 async function requireKey(provider: ProviderId): Promise<string> {
   const key = await getProviderKey(provider)
-  if (!key) throw new Error(`Connect ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} in Settings first.`)
+  if (!key) throw new Error(`Connect ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} in Connections first.`)
   return key
 }
 
-function toModel(provider: ProviderId, id: string): Model {
-  const lower = id.toLowerCase()
-  const capabilities: Model['capabilities'] = []
-  if (/gpt|o\d|claude/.test(lower) && !/embed|moderation/.test(lower)) capabilities.push('text', 'tools')
-  if (/gpt|claude/.test(lower) && !/mini-tts|audio|whisper/.test(lower)) capabilities.push('vision')
-  if (/image|dall-e/.test(lower)) capabilities.push('image')
-  if (/realtime|audio/.test(lower)) capabilities.push('realtime')
-  if (/whisper|transcri/.test(lower)) capabilities.push('transcription')
-  if (/deep-research/.test(lower)) capabilities.push('research')
-  return { id, provider, label: id.replaceAll('-', ' '), capabilities: [...new Set(capabilities)] }
+async function providerRequest<T>(
+  provider: ProviderId,
+  operation: () => Promise<T>,
+  removeRejectedStoredKey = true
+): Promise<T> {
+  try {
+    return await operation()
+  } catch (reason) {
+    if (isAbortError(reason)) throw reason
+    const error = reason instanceof ProviderConnectionError ? reason : providerConnectionError(provider, reason)
+    if (removeRejectedStoredKey && error.code === 'authentication') await removeProviderKey(provider)
+    throw error
+  }
 }
 
-function sortModels(a: Model, b: Model): number {
-  const aText = a.capabilities.includes('text') ? 0 : 1
-  const bText = b.capabilities.includes('text') ? 0 : 1
-  return aText - bText || b.id.localeCompare(a.id)
+function isAbortError(reason: unknown): boolean {
+  return Boolean(reason && typeof reason === 'object' && Reflect.get(reason, 'name') === 'AbortError')
 }

@@ -14,6 +14,7 @@ import {
   ChatRequestSchema, ProviderSchema, ResearchRequestSchema,
   type AppSnapshot, type Conversation, type Model, type ProviderId
 } from '../shared/contracts'
+import { ProviderConnectionError } from '../shared/provider-errors'
 import {
   isSafeDevelopmentUrl,
   isTrustedRendererUrl,
@@ -73,11 +74,20 @@ function registerIpc(): void {
   handleTrusted('provider:save', async (_event, rawProvider: unknown, key: unknown) => {
     const provider = ProviderSchema.parse(rawProvider)
     if (typeof key !== 'string') throw new Error('API key is required.')
-    await setProviderKey(provider, key)
-    configuredProviderIds.add(provider)
-    const discovered = await discoverProviderModels(provider)
-    discovered.forEach((model) => models.set(model.id, model))
-    await broadcastSnapshot()
+    try {
+      const discovered = await setProviderKey(
+        provider,
+        key,
+        (candidate) => discoverProviderModels(provider, candidate)
+      )
+      configuredProviderIds.add(provider)
+      replaceProviderModels(provider, discovered)
+      await broadcastSnapshot()
+    } catch (error) {
+      await refreshConfiguredProviderIds()
+      await broadcastSnapshot()
+      throw error
+    }
   })
   handleTrusted('provider:remove', async (_event, rawProvider: unknown) => {
     const provider = ProviderSchema.parse(rawProvider)
@@ -88,10 +98,19 @@ function registerIpc(): void {
   })
   handleTrusted('models:discover', async (_event, rawProvider: unknown) => {
     const provider = ProviderSchema.parse(rawProvider)
-    const discovered = await discoverProviderModels(provider)
-    discovered.forEach((model) => models.set(model.id, model))
-    await broadcastSnapshot()
-    return discovered
+    try {
+      const discovered = await discoverProviderModels(provider)
+      replaceProviderModels(provider, discovered)
+      await broadcastSnapshot()
+      return discovered
+    } catch (error) {
+      if (error instanceof ProviderConnectionError && error.code === 'authentication') {
+        configuredProviderIds.delete(provider)
+        replaceProviderModels(provider, [])
+        await broadcastSnapshot()
+      }
+      throw error
+    }
   })
   handleTrusted('conversation:create', async (_event, rawMode: unknown) => {
     const mode = rawMode === 'council' ? 'council' : 'solo'
@@ -133,7 +152,7 @@ function registerIpc(): void {
   })
   handleTrusted('research:start', async (_event, rawRequest: unknown) => {
     const request = ResearchRequestSchema.parse(rawRequest)
-    return startResearchJob(request.query, request.depth)
+    return startResearchJob(request.query, request.depth, capabilityModel('research'))
   })
   handleTrusted('job:cancel', (_event, id: unknown) => {
     if (typeof id === 'string') cancelJob(id)
@@ -199,7 +218,45 @@ function registerIpc(): void {
 }
 
 function transcriptionModel(): string {
-  return [...models.values()].find((model) => model.provider === 'openai' && model.capabilities.includes('transcription'))?.id ?? 'whisper-1'
+  return capabilityModel('transcription')
+}
+
+function capabilityModel(capability: 'research' | 'transcription'): string {
+  const available = [...models.values()].find(
+    (model) => model.provider === 'openai' && model.capabilities.includes(capability)
+  )
+  if (!available) {
+    throw new Error(`OpenAI has no account-available ${capability} model. Refresh OpenAI in Connections or check account access.`)
+  }
+  return available.id
+}
+
+function replaceProviderModels(provider: ProviderId, discovered: Model[]): void {
+  for (const [id, model] of models) if (model.provider === provider) models.delete(id)
+  discovered.forEach((model) => models.set(model.id, model))
+}
+
+async function refreshConfiguredProviderIds(): Promise<void> {
+  const configured = await configuredProviders()
+  configuredProviderIds.clear()
+  configured.forEach((provider) => configuredProviderIds.add(provider))
+}
+
+async function restoreProviderModels(): Promise<void> {
+  await refreshConfiguredProviderIds()
+  for (const provider of await configuredProviders()) {
+    try {
+      replaceProviderModels(provider, await discoverProviderModels(provider))
+    } catch (error) {
+      if (error instanceof ProviderConnectionError && error.code === 'authentication') {
+        configuredProviderIds.delete(provider)
+        replaceProviderModels(provider, [])
+        await diagnostic('provider-key-rejected', { provider })
+      } else {
+        await diagnostic('provider-model-discovery-failed', { provider })
+      }
+    }
+  }
 }
 
 async function createWindow(): Promise<void> {
@@ -244,6 +301,9 @@ app.whenReady().then(async () => {
   configureJobNotifications(() => void broadcastSnapshot())
   configureSessionSecurity()
   await createWindow()
+  void restoreProviderModels()
+    .then(() => broadcastSnapshot())
+    .catch(() => diagnostic('provider-model-restore-failed'))
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) void createWindow() })
 })
 

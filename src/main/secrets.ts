@@ -3,10 +3,23 @@ import type { ProviderId } from '../shared/contracts'
 
 const SERVICE = 'com.nexus.desktop'
 
-export async function setProviderKey(provider: ProviderId, key: string): Promise<void> {
+export async function setProviderKey<T>(
+  provider: ProviderId,
+  key: string,
+  testConnection: (candidate: string) => Promise<T>
+): Promise<T> {
   const normalized = key.trim()
   if (normalized.length < 20 || /\s/.test(normalized)) throw new Error('The API key format is not valid.')
+  const existing = await keytar.getPassword(SERVICE, provider)
+  let result: T
+  try {
+    result = await testConnection(normalized)
+  } catch (error) {
+    if (existing === normalized) await keytar.deletePassword(SERVICE, provider)
+    throw error
+  }
   await keytar.setPassword(SERVICE, provider, normalized)
+  return result
 }
 
 export function getProviderKey(provider: ProviderId): Promise<string | null> {

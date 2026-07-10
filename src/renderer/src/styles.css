@@ -195,6 +195,9 @@ button { color: inherit; }
 .key-entry input { min-width: 0; flex: 1; padding: 6px 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 9px; }
 .key-entry button, .connected { padding: 7px 8px; border: 0; border-radius: 6px; color: #14121a; background: var(--violet-soft); font-size: 8px; font-weight: 700; }
 .connected { color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.connection-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.connection-actions button { padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: transparent; font-size: 8px; font-weight: 700; }
+.connection-actions .connected { border: 0; color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
 .privacy-note { display: flex; gap: 13px; margin-top: 19px; padding: 18px 25px 23px; border-top: 1px solid var(--line); }
 .privacy-note > span { color: var(--violet); font-family: "SFMono-Regular", monospace; font-size: 9px; }
 .privacy-note strong { font-size: 10px; }
