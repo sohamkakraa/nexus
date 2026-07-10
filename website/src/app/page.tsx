@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
+import { DownloadExperience } from "@/components/DownloadExperience";
 import styles from "./page.module.css";
 
 const github = "https://github.com/sohamkakraa/nexus";
 const releases = `${github}/releases`;
-const gettingStarted = "/docs#getting-started";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -12,7 +12,7 @@ const structuredData = {
       "@type": "SoftwareApplication",
       name: "Nexus",
       applicationCategory: "ProductivityApplication",
-      operatingSystem: "macOS",
+      operatingSystem: "macOS, Windows, Linux",
       url: "https://nexus.sohamkakra.com",
       softwareVersion: "0.1.0",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
@@ -26,17 +26,17 @@ const structuredData = {
     },
     {
       "@type": "Product",
-      name: "Nexus for macOS",
+      name: "Nexus Desktop",
       category: "AI productivity software",
       description:
-        "An open-source, local-first macOS workspace for comparing OpenAI and Anthropic responses.",
+        "An open-source, local-first desktop workspace for comparing OpenAI and Anthropic responses.",
       brand: { "@type": "Brand", name: "Nexus" },
       offers: {
         "@type": "Offer",
         price: "0",
         priceCurrency: "USD",
         availability: "https://schema.org/InStock",
-        url: "https://nexus.sohamkakra.com/docs#getting-started",
+        url: "https://nexus.sohamkakra.com/download",
       },
     },
     {
@@ -47,7 +47,7 @@ const structuredData = {
           name: "Does Nexus store my API keys?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Nexus stores provider API keys in macOS Keychain. The marketing website never receives or handles API keys.",
+            text: "Nexus stores provider API keys in the operating system credential store. The marketing website never receives or handles API keys.",
           },
         },
         {
@@ -96,7 +96,7 @@ export default function Home() {
           <a href="/docs">Docs</a>
           <a href={github} target="_blank" rel="noreferrer">GitHub</a>
         </nav>
-        <a className={styles.navDownload} href={releases}>Release status <span>↗</span></a>
+        <a className={styles.navDownload} href="/download">Download <span>↓</span></a>
       </header>
 
       <main id="top">
@@ -107,14 +107,14 @@ export default function Home() {
             <h1>Don&apos;t ask one AI.<span>Convene a council.</span></h1>
             <p>
               Nexus lets OpenAI and Anthropic think independently, challenge weak
-              assumptions, and return one considered answer—privately on your Mac.
+              assumptions, and return one considered answer—privately on your desktop.
             </p>
             <div className={styles.heroActions}>
-              <a className={styles.primary} href={gettingStarted}><AppleIcon /> Build the source beta</a>
+              <DownloadExperience compact />
               <a className={styles.secondary} href={github} target="_blank" rel="noreferrer"><GitHubIcon /> Read the source</a>
             </div>
             <div className={styles.requirements}>
-              <span>Source beta</span><i /><span>macOS 14+</span><i /><span>Bring your own keys</span>
+              <span>macOS · Windows · Linux</span><i /><span>Architecture matched locally</span><i /><span>Bring your own keys</span>
             </div>
           </div>
           <CouncilDemo />
@@ -123,15 +123,15 @@ export default function Home() {
         <section className={styles.releaseStatus} aria-labelledby="release-title">
           <div>
             <div className={styles.sectionLabel}>Release status</div>
-            <h2 id="release-title">Source open. Signed build pending.</h2>
+            <h2 id="release-title">Source open. Public installers pending.</h2>
           </div>
           <p>
-            Nexus is currently available as an auditable source beta. A public macOS
-            installer will follow only after Developer ID signing and Apple
-            notarization are configured and verified.
+            Nexus currently has no compatible stable installer in its versioned
+            manifest. Release automation is configured for macOS, Windows, and Linux;
+            unsigned output remains clearly marked as a prerelease.
           </p>
           <div>
-            <a className={styles.primary} href={gettingStarted}>Build from source</a>
+            <a className={styles.primary} href="/download">Open downloads</a>
             <a className={styles.textLink} href={releases}>Inspect releases <span>→</span></a>
           </div>
         </section>
@@ -177,7 +177,7 @@ export default function Home() {
             </article>
             <article><VoiceVisual /><span className={styles.tag}>Realtime</span><h3>Call the agent.</h3><p>Talk naturally, opt into recording, and turn meetings into local transcripts.</p></article>
             <article><div className={styles.filesVisual}><span>brief.pdf</span><span>screen.png</span><span>data.csv</span><span>+7</span></div><span className={styles.tag}>Multimodal</span><h3>Bring the whole brief.</h3><p>Drop images, PDFs, documents, code, data, or audio into one conversation.</p></article>
-            <article><div className={styles.toolsVisual}><span>MCP</span><i /><span>CLI</span><i /><span>macOS</span></div><span className={styles.tag}>Tools</span><h3>Power with a permission slip.</h3><p>Connect MCP, the command line, and macOS actions with explicit approvals.</p></article>
+            <article><div className={styles.toolsVisual}><span>MCP</span><i /><span>CLI</span><i /><span>OS</span></div><span className={styles.tag}>Tools</span><h3>Power with a permission slip.</h3><p>Connect MCP, the command line, and supported system actions with explicit approvals.</p></article>
           </div>
         </section>
 
@@ -187,13 +187,13 @@ export default function Home() {
             <h2>Your keys unlock<br />your models. Not us.</h2>
             <p>
               Nexus is a desktop client, not an AI proxy. The website never asks for API
-              keys. The app stores them in macOS Keychain and sends requests directly to
+              keys. The app stores them in your operating system credential store and sends requests directly to
               the providers you select.
             </p>
             <a href="/security">Read the security architecture <span>→</span></a>
           </div>
           <div className={styles.securityMap} aria-label="Nexus data flow">
-            <div className={styles.device}><span>Your Mac</span><strong>Nexus</strong><small>history · files · permissions</small><div className={styles.keychip}>⌁ macOS Keychain</div></div>
+            <div className={styles.device}><span>Your device</span><strong>Nexus</strong><small>history · files · permissions</small><div className={styles.keychip}>⌁ OS credential store</div></div>
             <div className={styles.connection}><i /><span>TLS</span><i /></div>
             <div className={styles.providers}><div><span>O</span><b>OpenAI API</b></div><div><span>A</span><b>Anthropic API</b></div></div>
             <p>No Nexus cloud database. No shared API key. No silent telemetry.</p>
@@ -211,9 +211,9 @@ export default function Home() {
           <h2>Before you install.</h2>
           <div className={styles.faqGrid}>
             <details open><summary>Is Nexus actually free?</summary><p>Yes. The app is MIT licensed and has no subscription. OpenAI and Anthropic charge your own API account for usage.</p></details>
-            <details><summary>Can Nexus see my API keys?</summary><p>The desktop code reads keys from macOS Keychain to call your selected provider. The website and maintainers never receive them.</p></details>
+            <details><summary>Can Nexus see my API keys?</summary><p>The desktop process reads keys from the operating system credential store to call your selected provider. The website and maintainers never receive them.</p></details>
             <details><summary>Does Council mode expose private reasoning?</summary><p>No. Nexus exchanges proposals, evidence, and concise critiques—not hidden chain-of-thought.</p></details>
-            <details><summary>Can it control my Mac?</summary><p>Only through a narrow, allowlisted capability broker. Commands and system actions require a visible approval prompt.</p></details>
+            <details><summary>Can it control my system?</summary><p>Read-only command controls are cross-platform. Apple Events are available only on macOS and require a visible approval prompt.</p></details>
           </div>
         </section>
 
@@ -221,9 +221,9 @@ export default function Home() {
           <div className={styles.finalLines} aria-hidden="true"><i /><i /><i /></div>
           <NexusMark /><div className={styles.sectionLabel}>Ready when the question is difficult</div>
           <h2>Bring a second mind.</h2>
-          <p>Build the source beta, connect the providers you already use, and convene your first Council.</p>
-          <a className={styles.primary} href={gettingStarted}><AppleIcon /> Get started on macOS</a>
-          <small>Free and open source · source beta · macOS 14+</small>
+          <p>Download a verified build when available, connect the providers you already use, and convene your first Council.</p>
+          <DownloadExperience compact />
+          <small>Free and open source · macOS · Windows · Linux</small>
         </section>
       </main>
 
@@ -266,10 +266,6 @@ function VoiceVisual() {
 
 function NexusMark() {
   return <span className={styles.nexusMark} aria-hidden="true"><i /><i /></span>;
-}
-
-function AppleIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.03-3.15 2.57-4.68 2.69-4.75a5.77 5.77 0 0 0-4.54-2.46c-1.91-.2-3.76 1.14-4.73 1.14-1 0-2.5-1.12-4.12-1.08a6.02 6.02 0 0 0-5.07 3.09c-2.2 3.8-.56 9.39 1.55 12.46 1.06 1.51 2.3 3.2 3.92 3.14 1.58-.07 2.17-1 4.08-1s2.44 1 4.1.96c1.7-.03 2.76-1.51 3.78-3.03a12.4 12.4 0 0 0 1.73-3.52 5.46 5.46 0 0 1-3.39-4.95ZM13.95 3.3A5.53 5.53 0 0 0 15.22-.67a5.64 5.64 0 0 0-3.66 1.89A5.27 5.27 0 0 0 10.26 5c1.39.1 2.8-.7 3.69-1.7Z" transform="translate(1 1) scale(.92)" /></svg>;
 }
 
 function GitHubIcon() {

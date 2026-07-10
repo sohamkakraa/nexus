@@ -12,7 +12,20 @@ import { DiagnosticsSurface, PreferenceStudio, WorkflowLibrary } from './compone
 import { loadPreferences, resetPreferences, savePreferences, type WorkspacePreferences } from './preferences'
 import { configureWorkflow, WORKFLOWS, type WorkflowDefinition, type WorkflowDraft } from './workflows'
 
-const EMPTY: AppSnapshot = { conversations: [], models: [], configuredProviders: [], jobs: [], skills: [] }
+const EMPTY: AppSnapshot = {
+  conversations: [],
+  models: [],
+  configuredProviders: [],
+  jobs: [],
+  skills: [],
+  platform: {
+    os: 'macos',
+    architecture: 'other',
+    credentialStore: 'operating system credential store',
+    systemControls: false,
+    systemControlsMessage: 'Checking platform capabilities…'
+  }
+}
 type MainView = 'work' | 'preferences' | 'diagnostics'
 type Theme = 'dark' | 'light'
 
@@ -215,7 +228,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     setMainView('work')
   }
 
-  return <div className={`app theme-${theme}${inspectorOpen && mainView === 'work' ? ' inspector-visible' : ''}`} data-testid="app" data-density={preferences.density} data-accent={preferences.accent} data-emphasis={preferences.emphasis} data-motion={preferences.motion} data-inspector={inspectorOpen && mainView === 'work' ? 'open' : 'closed'}>
+  return <div className={`app theme-${theme} platform-${currentSnapshot.platform.os}${inspectorOpen && mainView === 'work' ? ' inspector-visible' : ''}`} data-testid="app" data-density={preferences.density} data-accent={preferences.accent} data-emphasis={preferences.emphasis} data-motion={preferences.motion} data-inspector={inspectorOpen && mainView === 'work' ? 'open' : 'closed'}>
     <a className="skip-link" href="#main-content">Skip to workspace</a>
     <aside className="sidebar" aria-label="Nexus navigation">
       <div className="traffic-space" />
@@ -233,7 +246,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
         {!currentSnapshot.conversations.length && snapshot ? <p className="empty-sidebar">No saved work yet.</p> : null}
       </nav>
       <div className="sidebar-footer">
-        <details className="local-history"><summary><ShieldCheck size={14} /> Stored on this Mac</summary><p>Work history and permissions stay local. Requests go only to providers and connectors you explicitly use.</p></details>
+        <details className="local-history"><summary><ShieldCheck size={14} /> Stored on this device</summary><p>Work history and permissions stay local. Requests go only to providers and connectors you explicitly use.</p></details>
         <div><button onClick={() => setSettingsOpen(true)}><KeyRound size={15} /> Connections</button><button onClick={() => {
           const next = theme === 'dark' ? 'light' : 'dark'
           setTheme(next)
@@ -291,7 +304,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       </> : null}
     </main>
 
-    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} models={textModels} primary={primaryModel} secondary={secondaryModel} mode={mode} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} skills={currentSnapshot.skills} badgeStyle={preferences.modelBadges} onModel={chooseModel} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
+    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} platform={currentSnapshot.platform} models={textModels} primary={primaryModel} secondary={secondaryModel} mode={mode} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} skills={currentSnapshot.skills} badgeStyle={preferences.modelBadges} onModel={chooseModel} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
     {settingsOpen ? <Connections api={nexusApi} snapshot={currentSnapshot} onClose={() => setSettingsOpen(false)} onError={setError} /> : null}
     {libraryOpen ? <div className="modal-backdrop" onMouseDown={() => setLibraryOpen(false)}><div className="modal workflow-modal" role="dialog" aria-modal="true" aria-label="Workflow library" onMouseDown={(event) => event.stopPropagation()}><WorkflowLibrary onChoose={chooseWorkflow} onClose={() => setLibraryOpen(false)} /></div></div> : null}
     {editorOpen && workflow ? <WorkflowEditor workflow={workflow} onClose={() => setEditorOpen(false)} onSave={(next) => {
@@ -330,7 +343,7 @@ function Welcome({ configuredProviders, showSuggestions, onWorkflow, onBrowse, o
 }
 
 function LoadingWorkspace(): React.JSX.Element {
-  return <div className="state-surface loading-state" role="status"><div className="loading-rail"><i /><i /><b /></div><p className="eyebrow">Opening local workspace</p><h2>Setting the table…</h2><p>Reading saved work and model capabilities from this Mac.</p></div>
+  return <div className="state-surface loading-state" role="status"><div className="loading-rail"><i /><i /><b /></div><p className="eyebrow">Opening local workspace</p><h2>Setting the table…</h2><p>Reading saved work and model capabilities from this device.</p></div>
 }
 
 function LoadFailure({ message, onRetry }: { message: string; onRetry: () => void }): React.JSX.Element {

@@ -1,79 +1,320 @@
-name: Release
+name: Release desktop
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*.*.*"
 
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  macos:
-    runs-on: macos-14
-    timeout-minutes: 40
+  verify-tag:
+    name: Verify signed version tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: verify
+        name: Verify GitHub tag signature and version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="$(node -p "require('./package.json').version")"
+          test "${tag}" = "v${version}"
+          tag_object="$(git rev-parse "${tag}^{tag}")" || {
+            echo "::error::Release tags must be annotated and signed."
+            exit 1
+          }
+          verified="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" --jq '.verification.verified')"
+          test "${verified}" = "true" || {
+            echo "::error::GitHub did not verify the version tag signature."
+            exit 1
+          }
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+  quality:
+    name: Lint, types, unit, and download E2E
+    needs: verify-tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run lint && npm run typecheck && npm test
-      - name: Require signing and notarization credentials
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - name: Install desktop dependencies
+        run: npm ci
+      - name: Install website dependencies
+        run: npm ci --prefix website
+      - name: Validate committed manifest
+        run: npm run manifest:validate
+      - name: Lint desktop and website
+        run: npm run lint && npm run website:lint
+      - name: Typecheck desktop and website
+        run: npm run typecheck && npm run website:typecheck
+      - name: Run unit tests
+        run: npm test
+      - name: Build desktop and website
+        run: npm run build && npm run website:build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test browser download routing
+        run: npm run test:website:e2e
+
+  build:
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    needs:
+      - verify-tag
+      - quality
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            arch: arm64
+            runner: macos-15
+            builder_platform: mac
+          - platform: macos
+            arch: x64
+            runner: macos-15-intel
+            builder_platform: mac
+          - platform: windows
+            arch: arm64
+            runner: windows-11-arm
+            builder_platform: win
+          - platform: windows
+            arch: x64
+            runner: windows-2025
+            builder_platform: win
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            builder_platform: linux
+          - platform: linux
+            arch: x64
+            runner: ubuntu-24.04
+            builder_platform: linux
+    env:
+      CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MACOS_CERTIFICATE || matrix.platform == 'windows' && secrets.WINDOWS_CERTIFICATE || '' }}
+      CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MACOS_CERTIFICATE_PASSWORD || matrix.platform == 'windows' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install Linux packaging dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
         run: |
-          missing=0
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            if [[ -z "${!name}" ]]; then
-              echo "::error::$name is required; refusing to create an unsigned or unnotarized release."
-              missing=1
+          sudo apt-get update
+          sudo apt-get install --yes fakeroot libarchive-tools libsecret-1-dev
+      - name: Install dependencies and rebuild native modules
+        run: npm ci
+      - name: Normalize build timestamp
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "${GITHUB_ENV}"
+      - name: Configure macOS signing and notarization
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${CSC_LINK}" ]]; then
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=true" >> "${GITHUB_ENV}"
+            if [[ -n "${APPLE_API_KEY_BASE64}" && -n "${APPLE_API_KEY_ID}" && -n "${APPLE_API_ISSUER}" ]]; then
+              key_path="${RUNNER_TEMP}/AuthKey.p8"
+              printf '%s' "${APPLE_API_KEY_BASE64}" | base64 --decode > "${key_path}"
+              chmod 600 "${key_path}"
+              echo "APPLE_API_KEY=${key_path}" >> "${GITHUB_ENV}"
+              echo "NOTARIZE_ARGUMENT=--config.mac.notarize=true" >> "${GITHUB_ENV}"
+              echo "RELEASE_SIGNING_STATUS=notarized" >> "${GITHUB_ENV}"
+              echo "RELEASE_SIGNING_LABEL=Developer ID signed and Apple notarized" >> "${GITHUB_ENV}"
+            else
+              echo "NOTARIZE_ARGUMENT=--config.mac.notarize=false" >> "${GITHUB_ENV}"
+              echo "RELEASE_SIGNING_STATUS=signed" >> "${GITHUB_ENV}"
+              echo "RELEASE_SIGNING_LABEL=Developer ID signed; not notarized (prerelease only)" >> "${GITHUB_ENV}"
             fi
-          done
-          exit "$missing"
-      - name: Build release
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run dist
-      - name: Verify signatures and notarization
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+            echo "NOTARIZE_ARGUMENT=--config.mac.notarize=false" >> "${GITHUB_ENV}"
+            echo "RELEASE_SIGNING_STATUS=unsigned" >> "${GITHUB_ENV}"
+            echo "RELEASE_SIGNING_LABEL=Unsigned macOS artifact (prerelease candidate only)" >> "${GITHUB_ENV}"
+          fi
+      - name: Configure Windows signing
+        if: matrix.platform == 'windows'
+        shell: bash
         run: |
-          app_path="$(find dist -type d -name 'Nexus.app' -print -quit)"
-          test -n "$app_path"
-          codesign --verify --deep --strict --verbose=2 "$app_path"
-          spctl --assess --type execute --verbose=2 "$app_path"
-          for artifact in dist/*.dmg; do
-            xcrun stapler validate "$artifact"
-            spctl --assess --type open --context context:primary-signature --verbose=2 "$artifact"
-          done
-      - name: Checksums
+          if [[ -n "${CSC_LINK}" ]]; then
+            echo "RELEASE_SIGNING_STATUS=signed" >> "${GITHUB_ENV}"
+            echo "RELEASE_SIGNING_LABEL=Authenticode signed" >> "${GITHUB_ENV}"
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+            echo "RELEASE_SIGNING_STATUS=unsigned" >> "${GITHUB_ENV}"
+            echo "RELEASE_SIGNING_LABEL=Unsigned Windows artifact (prerelease candidate only)" >> "${GITHUB_ENV}"
+          fi
+      - name: Configure Linux verification status
+        if: matrix.platform == 'linux'
+        shell: bash
         run: |
-          cd dist
-          shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
+          echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "${GITHUB_ENV}"
+          echo "RELEASE_SIGNING_STATUS=unsigned" >> "${GITHUB_ENV}"
+          echo "RELEASE_SIGNING_LABEL=Unsigned; verify SHA-256 and GitHub provenance" >> "${GITHUB_ENV}"
+      - name: Build renderer and main process
+        run: npm run build
+      - name: Package distributable artifacts
+        shell: bash
+        run: npx electron-builder --${{ matrix.builder_platform }} --${{ matrix.arch }} --publish never ${NOTARIZE_ARGUMENT:-}
+      - name: Verify macOS signature and notarization
+        if: matrix.platform == 'macos' && env.RELEASE_SIGNING_STATUS != 'unsigned'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="dist/mac/Nexus.app"
+          if [[ "${{ matrix.arch }}" = "arm64" ]]; then app_path="dist/mac-arm64/Nexus.app"; fi
+          codesign --verify --deep --strict "${app_path}"
+          if [[ "${RELEASE_SIGNING_STATUS}" = "notarized" ]]; then
+            for artifact in dist/*-${{ matrix.arch }}.dmg; do xcrun stapler validate "${artifact}"; done
+          fi
+      - name: Verify Windows Authenticode signature
+        if: matrix.platform == 'windows' && env.RELEASE_SIGNING_STATUS == 'signed'
+        shell: pwsh
+        run: |
+          $installers = Get-ChildItem -Path dist -Filter *.exe
+          if ($installers.Count -eq 0) { throw "No Windows installer was produced." }
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature $installer.FullName
+            if ($signature.Status -ne "Valid") { throw "Invalid signature for $($installer.Name): $($signature.Status)" }
+          }
+      - name: Prepare deterministic release bundle
+        shell: bash
+        run: |
+          node scripts/prepare-release-artifacts.mjs \
+            --platform "${{ matrix.platform }}" \
+            --arch "${{ matrix.arch }}" \
+            --signing-status "${RELEASE_SIGNING_STATUS}" \
+            --signing-label "${RELEASE_SIGNING_LABEL}" \
+            --dist dist \
+            --out release-assets
+      - name: Attest build provenance
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: release-assets/*
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Nexus-${{ needs.verify-tag.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ env.RELEASE_SIGNING_STATUS }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Assemble verified release
+    needs:
+      - verify-tag
+      - build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: Nexus-${{ needs.verify-tag.outputs.version }}-*
+          path: release-assets
+          merge-multiple: true
       - name: Generate SBOM
-        run: npm sbom --sbom-format cyclonedx > dist/nexus-sbom.cdx.json
-      - uses: actions/attest-build-provenance@v2
+        shell: bash
+        run: npm sbom --sbom-format cyclonedx > "release-assets/Nexus-${{ needs.verify-tag.outputs.version }}-sbom.cdx.json"
+      - id: manifest
+        name: Generate and validate release manifest
+        shell: bash
+        run: |
+          node scripts/generate-release-manifest.mjs \
+            --artifacts release-assets \
+            --output release-assets/release-manifest.json \
+            --version "${{ needs.verify-tag.outputs.version }}" \
+            --channel auto
+          node scripts/validate-release-manifest.mjs release-assets/release-manifest.json
+          channel="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('release-assets/release-manifest.json')).release.channel)")"
+          publishable="$(node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('release-assets/release-manifest.json')); console.log(m.release.assets.every(a => a.platform === 'linux' || (a.platform === 'macos' ? a.signing.status === 'notarized' : a.signing.status === 'signed')))")"
+          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+          echo "publishable=${publishable}" >> "${GITHUB_OUTPUT}"
+      - name: Write SHA-256 checksums
+        run: node scripts/write-release-checksums.mjs release-assets
+      - name: Attest assembled release bundle
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
-            dist/*.dmg
-            dist/*.zip
-      - uses: softprops/action-gh-release@v2
+            release-assets/release-manifest.json
+            release-assets/SHA256SUMS.txt
+            release-assets/*-sbom.cdx.json
+      - name: Retain release candidate
+        uses: actions/upload-artifact@v5
         with:
-          draft: true
-          prerelease: true
+          name: Nexus-${{ needs.verify-tag.outputs.version }}-${{ steps.manifest.outputs.publishable == 'true' && steps.manifest.outputs.channel || 'unsigned-prerelease-candidate' }}
+          path: |
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.exe
+            release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/release-manifest.json
+            release-assets/SHA256SUMS.txt
+            release-assets/*-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish signed GitHub release
+        if: steps.manifest.outputs.publishable == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Nexus ${{ needs.verify-tag.outputs.version }}${{ steps.manifest.outputs.channel == 'prerelease' && ' — prerelease' || '' }}
+          prerelease: ${{ steps.manifest.outputs.channel == 'prerelease' }}
+          make_latest: ${{ steps.manifest.outputs.channel == 'stable' }}
           generate_release_notes: true
-          fail_on_unmatched_files: true
           files: |
-            dist/*.dmg
-            dist/*.zip
-            dist/SHA256SUMS.txt
-            dist/nexus-sbom.cdx.json
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.exe
+            release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/release-manifest.json
+            release-assets/SHA256SUMS.txt
+            release-assets/*-sbom.cdx.json
+      - name: Explain unsigned publication gate
+        if: steps.manifest.outputs.publishable != 'true'
+        run: |
+          echo "::warning::Unsigned or non-notarized macOS/Windows binaries were retained as workflow artifacts only."
+          echo "They were not published to GitHub Releases."

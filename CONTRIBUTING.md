@@ -23,6 +23,8 @@ Nexus accepts focused bug fixes, tests, documentation, security hardening, acces
 
 ```sh
 npm run check
+npm run manifest:validate
+npm run test:website:e2e
 npm run test:e2e
 npm run package
 npm run website:build
@@ -33,4 +35,9 @@ Live provider tests are optional because they spend contributor credits.
 
 ## Release policy
 
-Release artifacts are created only from version tags after CI, CodeQL, secret scanning, packaged-app E2E, and checksums succeed. Autonomous agents may propose pull requests, but branch protections and release gates are authoritative.
+Release artifacts are created only from annotated, GitHub-verified signed version
+tags after CI, CodeQL, secret scanning, packaged-app E2E, and packaging gates
+succeed. Unsigned macOS or Windows candidates remain workflow artifacts and are
+not published automatically. Autonomous agents may propose pull requests, but
+branch protections and release gates are authoritative. See
+[RELEASING.md](RELEASING.md).

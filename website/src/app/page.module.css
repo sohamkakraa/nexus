@@ -1128,6 +1128,12 @@
   background: #fff;
 }
 
+.finalCta > div a,
+.finalCta > div button {
+  color: var(--ink);
+  background: #fff;
+}
+
 .finalCta small {
   margin-top: 14px;
   color: #6c7285;

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s · Nexus",
   },
   description:
-    "A free, open-source macOS AI workspace where OpenAI and Anthropic models draft, challenge, and improve one another—privately on your Mac.",
+    "A free, open-source desktop AI workspace where OpenAI and Anthropic models draft, challenge, and improve one another—privately on your device.",
   applicationName: "Nexus",
   authors: [{ name: "Soham Kakra", url: "https://sohamkakra.com" }],
   creator: "Soham Kakra",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "local-first AI",
     "MCP client",
     "AI research assistant",
-    "open-source macOS AI",
+    "open-source desktop AI",
   ],
   alternates: { canonical: "/" },
   openGraph: {
@@ -34,12 +34,12 @@ export const metadata: Metadata = {
     title: "Nexus — Two AI models. One considered answer.",
     description:
       "OpenAI and Anthropic think independently, challenge each other, and return one useful answer. Free, open source, and local-first.",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Nexus AI Council for macOS" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Nexus AI Council for desktop" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Nexus — Two AI models. One considered answer.",
-    description: "A free, open-source, local-first AI Council for macOS.",
+    description: "A free, open-source, local-first AI Council for macOS, Windows, and Linux.",
     images: ["/opengraph-image"],
   },
   robots: {

@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { delimiter, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SAFE_BINARIES = new Set(['pwd', 'ls', 'git', 'rg'])
@@ -78,25 +78,23 @@ export function restrictedChildEnvironment(
   source: NodeJS.ProcessEnv,
   executablePath = process.execPath
 ): Record<string, string> {
+  const windows = process.platform === 'win32'
   const path = [
     dirname(executablePath),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin',
-    '/usr/sbin',
-    '/sbin'
-  ].filter((entry, index, entries) => entries.indexOf(entry) === index).join(':')
+    ...(windows
+      ? [`${source.SystemRoot ?? 'C:\\Windows'}\\System32`]
+      : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'])
+  ].filter((entry, index, entries) => entries.indexOf(entry) === index).join(delimiter)
   return Object.fromEntries(Object.entries({
     PATH: path,
-    HOME: source.HOME,
-    TMPDIR: source.TMPDIR,
+    HOME: source.HOME ?? source.USERPROFILE,
+    TMPDIR: source.TMPDIR ?? source.TEMP,
     LANG: source.LANG ?? 'en_US.UTF-8',
     LC_ALL: source.LC_ALL,
     NO_COLOR: '1',
     CI: '1',
     GIT_CONFIG_NOSYSTEM: '1',
-    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_GLOBAL: windows ? 'NUL' : '/dev/null',
     GIT_TERMINAL_PROMPT: '0'
   }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
 }

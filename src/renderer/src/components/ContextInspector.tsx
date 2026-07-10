@@ -3,12 +3,19 @@ import {
   Activity, Bot, FlaskConical, Image, Link2, Search, Settings2, Sparkles,
   SquareTerminal, Users, X
 } from 'lucide-react'
-import type { AppSnapshot, Model, NexusApi, ProviderId } from '../../../shared/contracts'
+import type {
+  AppSnapshot,
+  Model,
+  NexusApi,
+  PlatformCapabilities,
+  ProviderId
+} from '../../../shared/contracts'
 import type { ModelBadgeStyle } from '../preferences'
 import type { WorkflowDraft } from '../workflows'
 
-export function ContextInspector({ api, models, primary, secondary, mode, workflow, jobs, imageModels, skills, badgeStyle, onModel, onError, onClose }: {
+export function ContextInspector({ api, platform, models, primary, secondary, mode, workflow, jobs, imageModels, skills, badgeStyle, onModel, onError, onClose }: {
   api: NexusApi
+  platform: PlatformCapabilities
   models: Model[]
   primary: string
   secondary: string
@@ -99,9 +106,10 @@ export function ContextInspector({ api, models, primary, secondary, mode, workfl
         }}>Request command approval</button>
         {terminalOutput ? <pre className="terminal-output">{terminalOutput}</pre> : null}
         <div className="button-pair system-actions">
-          <button onClick={() => void api.runSystemAction('toggle-dark-mode').catch((reason) => onError(messageOf(reason)))}>Toggle appearance</button>
-          <button onClick={() => void api.runSystemAction('open-app', 'Finder').catch((reason) => onError(messageOf(reason)))}>Open Finder</button>
+          <button disabled={!platform.systemControls} onClick={() => void api.runSystemAction('toggle-dark-mode').catch((reason) => onError(messageOf(reason)))}>Toggle appearance</button>
+          <button disabled={!platform.systemControls} onClick={() => void api.runSystemAction('open-app', 'Finder').catch((reason) => onError(messageOf(reason)))}>Open Finder</button>
         </div>
+        <small className="tool-hint">{platform.systemControlsMessage}</small>
       </details>
 
       <details open={workflow?.id === 'connector'}>

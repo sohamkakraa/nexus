@@ -15,6 +15,7 @@ import {
   pruneHistoryBefore
 } from './database'
 import { listSkills } from './skills'
+import { platformCapabilities } from './platform'
 
 const DEFAULT_SETTINGS: PrivacySettings = PrivacySettingsSchema.parse({})
 
@@ -75,7 +76,7 @@ export async function exportLocalData(): Promise<string | null> {
     })),
     attachments: exportedFiles,
     skills: await listSkills(),
-    excluded: ['macOS Keychain credentials', 'provider API keys', 'temporary job state']
+    excluded: [`${platformCapabilities().credentialStore} credentials`, 'provider API keys', 'temporary job state']
   }
   await writeFile(join(exportDirectory, 'nexus-data.json'), JSON.stringify(payload, null, 2), { mode: 0o600 })
   return exportDirectory
@@ -89,7 +90,7 @@ export async function deleteLocalData(): Promise<boolean> {
     cancelId: 0,
     title: 'Delete local Nexus data?',
     message: 'Delete conversations, imported files, recordings, personalization, skills, and diagnostics?',
-    detail: 'This cannot be undone. Provider API keys remain in macOS Keychain and can be removed separately in Connections.',
+    detail: `This cannot be undone. Provider API keys remain in ${platformCapabilities().credentialStore} and can be removed separately in Connections.`,
     noLink: true
   })
   if (confirmation.response !== 1) return false

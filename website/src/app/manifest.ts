@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Nexus — AI Council for macOS",
+    name: "Nexus — Desktop AI Council",
     short_name: "Nexus",
     description: "Open-source, local-first AI Council for macOS.",
     start_url: "/",

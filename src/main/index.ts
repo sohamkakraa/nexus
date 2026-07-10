@@ -31,6 +31,7 @@ import {
 import { callMcpTool, ConnectorSchema, connectMcp, disconnectAllMcp } from './mcp'
 import { runChat } from './orchestrator'
 import { runApprovedCommand, runApprovedSystemAction } from './permissions'
+import { platformCapabilities } from './platform'
 import {
   applyHistoryRetention,
   deleteLocalData,
@@ -61,7 +62,8 @@ async function snapshot(): Promise<AppSnapshot> {
     models: [...models.values()],
     configuredProviders: [...configuredProviderIds],
     jobs: listJobs(),
-    skills: await listSkills()
+    skills: await listSkills(),
+    platform: platformCapabilities()
   }
 }
 
@@ -266,8 +268,9 @@ async function createWindow(): Promise<void> {
     minWidth: 980,
     minHeight: 680,
     show: false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 18 },
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } }
+      : { autoHideMenuBar: true }),
     backgroundColor: '#0b0d12',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
