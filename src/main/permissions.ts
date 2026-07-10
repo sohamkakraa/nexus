@@ -35,7 +35,7 @@ export async function runApprovedCommand(command: string, cwd?: string): Promise
   if (approval.response !== 1) throw new Error('Command cancelled.')
 
   try {
-    const result = await execute(parsed.binary, parsed.args, {
+    const result = await execute(parsed.binary, executionArguments(parsed), {
       cwd: workingDirectory,
       timeout: 30_000,
       maxBuffer: 2 * 1024 * 1024,
@@ -75,5 +75,13 @@ export async function runApprovedSystemAction(
   })
   if (approval.response !== 1) throw new Error('System action cancelled.')
   await execute('/usr/bin/osascript', ['-e', script], { timeout: 15_000 })
+}
+
+function executionArguments(parsed: { binary: string; args: string[] }): string[] {
+  if (parsed.binary !== 'git') return parsed.args
+  const [subcommand, ...args] = parsed.args
+  if (!subcommand) throw new Error('A read-only git subcommand is required.')
+  const inspectionFlags = ['diff', 'show'].includes(subcommand) ? ['--no-ext-diff', '--no-textconv'] : []
+  return ['-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', subcommand, ...inspectionFlags, ...args]
 }
 

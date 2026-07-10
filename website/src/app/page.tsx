@@ -173,7 +173,7 @@ export default function Home() {
                 <div><span>Source map</span><b>18</b><small>credible references</small></div>
                 <ol><li><i />Primary sources</li><li><i />Contradictions</li><li><i />Synthesis</li></ol>
               </div>
-              <div><span className={styles.tag}>Research</span><h3>Frontier search with receipts.</h3><p>Quick answers or deep reports with source inspection, budgets, progress, and cancellation.</p></div>
+              <div><span className={styles.tag}>Research</span><h3>Frontier search with receipts.</h3><p>Quick answers or deep reports with source inspection, bounded tool calls, progress, and cancellation.</p></div>
             </article>
             <article><VoiceVisual /><span className={styles.tag}>Realtime</span><h3>Call the agent.</h3><p>Talk naturally, opt into recording, and turn meetings into local transcripts.</p></article>
             <article><div className={styles.filesVisual}><span>brief.pdf</span><span>screen.png</span><span>data.csv</span><span>+7</span></div><span className={styles.tag}>Multimodal</span><h3>Bring the whole brief.</h3><p>Drop images, PDFs, documents, code, data, or audio into one conversation.</p></article>

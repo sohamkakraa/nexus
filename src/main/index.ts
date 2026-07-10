@@ -17,7 +17,8 @@ import {
 import {
   isSafeDevelopmentUrl,
   isTrustedRendererUrl,
-  redactForPreview
+  redactForPreview,
+  redactSecrets
 } from '../shared/safety'
 import { getAttachments, insertConversation, listConversations, openDatabase } from './database'
 import { diagnostic } from './diagnostics'
@@ -148,8 +149,8 @@ function registerIpc(): void {
   handleTrusted('mcp:connect', async (_event, rawConnector: unknown) => {
     const connector = ConnectorSchema.parse(rawConnector)
     const detail = connector.transport === 'http'
-      ? `Remote HTTPS server: ${connector.url}\nCredentials are held in memory for this session only.`
-      : `Local process: ${connector.command} ${connector.args.join(' ')}\nOnly a minimal environment without provider credentials will be shared.`
+      ? `Remote HTTPS server: ${redactSecrets(connector.url)}\nCredentials are held in memory for this session only.`
+      : `Local process: ${redactSecrets(`${connector.command} ${connector.args.join(' ')}`)}\nOnly a minimal environment without provider credentials will be shared.`
     const approval = await dialog.showMessageBox({
       type: 'warning', buttons: ['Cancel', 'Connect once'], defaultId: 0, cancelId: 0,
       title: 'Connect to MCP server?', message: connector.name, detail, noLink: true
@@ -280,7 +281,10 @@ function configureSessionSecurity(): void {
   session.defaultSession.setPermissionCheckHandler((contents, permission, requestingOrigin) => {
     return permission === 'media'
       && trustedContents(contents)
-      && isTrustedRendererUrl(requestingOrigin, rendererFile, developmentRendererUrl)
+      && (
+        requestingOrigin === 'file://'
+        || isTrustedRendererUrl(requestingOrigin, rendererFile, developmentRendererUrl)
+      )
   })
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const mediaTypes = 'mediaTypes' in details && Array.isArray(details.mediaTypes) ? details.mediaTypes : []
