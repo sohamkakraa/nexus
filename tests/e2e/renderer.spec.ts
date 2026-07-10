@@ -73,6 +73,7 @@ test('researcher configures and edits a guided workflow safely', async () => {
     await harness.page.getByRole('button', { name: /Research brief/ }).click()
     await expect(harness.page.getByRole('textbox', { name: 'Working brief' })).toHaveValue(/Research question:/)
     await expect(harness.page.getByText('Two models → one synthesis')).toBeVisible()
+    await expect(harness.page.getByRole('combobox', { name: /Challenger/ })).toHaveValue('claude-opus-4-5')
     await harness.page.getByRole('button', { name: 'Edit method' }).click()
     await harness.page.getByLabel('Workflow name').fill('Evidence review')
     await harness.page.getByRole('button', { name: 'Save method' }).click()

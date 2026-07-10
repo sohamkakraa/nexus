@@ -31,9 +31,11 @@ export function ContextInspector({ api, models, primary, secondary, mode, workfl
   const [skillDescription, setSkillDescription] = useState('')
   const openai = models.filter((model) => model.provider === 'openai')
   const anthropic = models.filter((model) => model.provider === 'anthropic')
-  const secondaryModels = primary && providerOf(primary) === 'openai'
-    ? anthropic
-    : openai.length ? openai : models.filter((model) => model.id !== primary)
+  const primaryProvider = models.find((model) => model.id === primary)?.provider
+  const crossProviderModels = models.filter((model) => model.id !== primary && model.provider !== primaryProvider)
+  const secondaryModels = crossProviderModels.length
+    ? crossProviderModels
+    : primaryProvider === 'openai' ? anthropic : openai.length ? openai : models.filter((model) => model.id !== primary)
 
   return <aside className="inspector" aria-label="Context inspector">
     <div className="inspector-head">
@@ -164,11 +166,6 @@ function ModelBadge({ model, style }: { model?: Model; style: ModelBadgeStyle })
 
 function providerLabel(provider: ProviderId): string {
   return provider === 'anthropic' ? 'Anthropic' : 'OpenAI'
-}
-
-function providerOf(model: string): ProviderId | '' {
-  if (!model) return ''
-  return model.toLowerCase().includes('claude') ? 'anthropic' : 'openai'
 }
 
 function messageOf(reason: unknown): string {
