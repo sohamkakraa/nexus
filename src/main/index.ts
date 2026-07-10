@@ -54,7 +54,10 @@ const developmentRendererUrl = !app.isPackaged
   && isSafeDevelopmentUrl(process.env.ELECTRON_RENDERER_URL)
   ? process.env.ELECTRON_RENDERER_URL
   : undefined
-const restoreConfiguredProviders = app.isPackaged || process.env.NEXUS_DISABLE_PROVIDER_RESTORE !== '1'
+const restoreConfiguredProviders = !(
+  process.env.NEXUS_USER_DATA_DIR
+  && process.env.NEXUS_DISABLE_PROVIDER_RESTORE === '1'
+)
 if (!app.isPackaged && process.env.NEXUS_USER_DATA_DIR) app.setPath('userData', process.env.NEXUS_USER_DATA_DIR)
 
 async function snapshot(): Promise<AppSnapshot> {

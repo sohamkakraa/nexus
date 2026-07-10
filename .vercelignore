@@ -1,0 +1,17 @@
+.git
+.vercel
+node_modules
+dist
+out
+release-assets
+coverage
+test-results
+playwright-report
+website/node_modules
+website/.next
+website/.next-*
+website/test-results
+website/playwright-report
+*.dmg
+*.zip
+*.blockmap
