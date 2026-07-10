@@ -52,7 +52,7 @@ export function PreferenceStudio({ preferences, onChange, onReset }: {
       <div>
         <p className="eyebrow">Yours, locally</p>
         <h2 id="preference-title">Shape the workspace</h2>
-        <p>These choices stay on this Mac. Nexus does not infer them from engagement or send behavior data.</p>
+        <p>These choices stay on this device. Nexus does not infer them from engagement or send behavior data.</p>
       </div>
       <button className="quiet-button" onClick={onReset}><RotateCcw size={15} /> Reset</button>
     </div>
@@ -206,7 +206,7 @@ export function DiagnosticsSurface({ api, snapshot, onUseConversation, onOpenCon
       id: 'recording',
       icon: <Mic size={17} />,
       title: 'Recording permission',
-      description: 'Reads macOS microphone permission state. This check does not start recording.',
+      description: 'Reads the operating system microphone permission state. This check does not start recording.',
       action: 'Read permission',
       onRun: () => run('recording', async () => {
         if (!navigator.permissions?.query) throw new Error('Permission state is unavailable in this runtime.')

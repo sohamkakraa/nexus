@@ -4,7 +4,7 @@ import styles from "../content.module.css";
 
 export const metadata: Metadata = {
   title: "Documentation",
-  description: "Build Nexus from source, connect provider keys, and understand local data and permission controls.",
+  description: "Download or build Nexus, verify artifacts, connect provider keys, and understand local data and permission controls.",
   alternates: { canonical: "/docs" },
 };
 
@@ -14,23 +14,31 @@ export default function DocsPage() {
       <SiteHeader />
       <main className={styles.main}>
         <header className={styles.hero}>
-          <div><p className={styles.eyebrow}>Documentation / source beta</p><h1>Start with the code in view.</h1></div>
-          <p>Install the current source beta, connect your own AI provider accounts, and keep control of every privileged action.</p>
+          <div><p className={styles.eyebrow}>Documentation / desktop beta</p><h1>Start with the code in view.</h1></div>
+          <p>Use a verified build when available or install from source, connect your own provider accounts, and keep control of every privileged action.</p>
         </header>
         <div className={styles.content}>
           <article className={styles.article}>
             <section id="getting-started">
               <h2>Getting started</h2>
-              <p>Nexus currently ships as source code, not as a signed public installer. You need macOS 14 or newer, Node.js 22 or newer, npm, and at least one OpenAI or Anthropic API key.</p>
+              <p>Nexus currently has no compatible stable installer in its versioned manifest. Source development supports macOS, Windows, and Linux with Node.js 22 or newer, npm, and at least one OpenAI or Anthropic API key.</p>
               <pre><code>{`git clone ${github}.git
 cd nexus
 npm install
 npm run dev`}</code></pre>
-              <div className={styles.note}><strong>Installer status</strong><p>Do not bypass macOS security warnings for an unverified build. A downloadable installer will be published only after Developer ID signing and Apple notarization pass in the release workflow.</p></div>
+              <div className={styles.note}><strong>Installer status</strong><p>Check the <a href="/download">download page</a>. Unsigned macOS or Windows candidates are retained as workflow artifacts and are not published as stable downloads.</p></div>
+            </section>
+            <section id="downloads">
+              <h2>Verify a download</h2>
+              <ol>
+                <li>Confirm the download page matched your platform and architecture from the stable release manifest.</li>
+                <li>Compare the file&apos;s SHA-256 with <code>SHA256SUMS.txt</code> from the same tagged GitHub release.</li>
+                <li>Confirm macOS reports a notarized Developer ID build or Windows reports a valid Authenticode publisher.</li>
+              </ol>
             </section>
             <section id="keys">
               <h2>Bring your own keys</h2>
-              <p>Open Connections in the desktop app and add an API key for the provider you want to use. Nexus stores provider keys through macOS Keychain. They are not written to SQLite, preferences, diagnostics, exported data, the website, or child-process environments.</p>
+              <p>Open Connections in the desktop app and add an API key for the provider you want to use. Nexus stores provider keys in macOS Keychain, Windows Credential Manager, or a Secret Service-compatible Linux keyring. They are not written to SQLite, preferences, diagnostics, exported data, the website, or child-process environments.</p>
               <p>Requests go directly from the app to the selected provider. Provider pricing, data controls, and retention terms still apply to those requests.</p>
             </section>
             <section id="council">
@@ -50,22 +58,25 @@ npm run dev`}</code></pre>
             <section id="local-data">
               <h2>Local data controls</h2>
               <p>Connections includes controls to set history retention, inspect or delete optional personalization notes, export conversations and imported files, and delete local history, files, recordings, skills, preferences, and diagnostics.</p>
-              <p>Deleting local data does not silently remove Keychain credentials. Remove each provider in Connections when you also want its Keychain entry deleted.</p>
+              <p>Deleting local data does not silently remove credential-store entries. Remove each provider in Connections when you also want its stored key deleted.</p>
             </section>
             <section id="verification">
               <h2>Verify a checkout</h2>
               <pre><code>{`npm run lint
 npm run typecheck
 npm test
+npm run manifest:validate
 npm run build
 npm run package
-npm --prefix website run build`}</code></pre>
+npm --prefix website run build
+npm run test:website:e2e`}</code></pre>
               <p>Live provider tests are not run by default because they require personal credentials and can incur provider charges.</p>
             </section>
           </article>
           <aside className={styles.aside} aria-label="On this page">
             <span>On this page</span>
             <a href="#getting-started">Getting started</a>
+            <a href="#downloads">Verify downloads</a>
             <a href="#keys">Provider keys</a>
             <a href="#council">Council mode</a>
             <a href="#permissions">Permissions</a>

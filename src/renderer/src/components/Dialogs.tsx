@@ -120,7 +120,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
         <div><p className="eyebrow">Bring your own models</p><h2 id="connections-title">Connections</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close connections"><X size={18} /></button>
       </div>
-      <p className="modal-intro">Keys are stored in macOS Keychain. Connecting checks the provider’s model list; it does not make a generation request.</p>
+      <p className="modal-intro">Keys are stored in {snapshot.platform.credentialStore}. Connecting checks the provider’s model list; it does not make a generation request.</p>
       {(['openai', 'anthropic'] as ProviderId[]).map((provider) => {
         const connected = snapshot.configuredProviders.includes(provider)
         return <div className="provider-card" key={provider}>
@@ -137,7 +137,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
             : <div className="key-entry"><KeyRound size={15} /><input aria-label={`${provider} API key`} type="password" value={keys[provider]} placeholder={provider === 'openai' ? 'sk-…' : 'sk-ant-…'} onChange={(event) => setKeys((current) => ({ ...current, [provider]: event.target.value }))} /><button disabled={!keys[provider] || busy === provider} onClick={() => void connect(provider)}>{busy === provider ? 'Checking…' : 'Connect'}</button></div>}
         </div>
       })}
-      <div className="privacy-note"><ShieldCheck size={17} /><div><strong>What stays local</strong><p>Work, imported files, preferences, and permission decisions remain on this Mac. Only requests you run go to the connection you choose.</p></div></div>
+      <div className="privacy-note"><ShieldCheck size={17} /><div><strong>What stays local</strong><p>Work, imported files, preferences, and permission decisions remain on this device. Only requests you run go to the connection you choose.</p></div></div>
       <section className="data-controls" aria-labelledby="local-data-title">
         <div>
           <p className="eyebrow">Local controls</p>

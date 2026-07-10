@@ -17,7 +17,7 @@ export default function OpenGraphImage() {
         Nexus
       </div>
       <div style={{ display: "flex", flexDirection: "column", maxWidth: 850 }}>
-        <div style={{ marginBottom: 18, color: "#6958e8", fontSize: 18, letterSpacing: 3, textTransform: "uppercase" }}>Open source · local first · macOS</div>
+        <div style={{ marginBottom: 18, color: "#6958e8", fontSize: 18, letterSpacing: 3, textTransform: "uppercase" }}>Open source · macOS · Windows · Linux</div>
         <div style={{ display: "flex", flexDirection: "column", fontFamily: "serif", fontSize: 82, lineHeight: .95, letterSpacing: -4 }}>
           <span>Don&apos;t ask one AI.</span>
           <span>Convene a council.</span>

@@ -89,6 +89,7 @@ button, select, input, textarea { color: inherit; }
 .app.theme-light[data-accent="orchid"] { --accent: #7b46c2; --accent-strong: #6835ad; --counter: #167c80; --counter-soft: #0d686b; }
 
 .traffic-space { height: 46px; flex: 0 0 auto; -webkit-app-region: drag; }
+.platform-windows .traffic-space, .platform-linux .traffic-space { height: 8px; }
 .sidebar {
   position: relative;
   z-index: 2;

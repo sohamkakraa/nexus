@@ -21,12 +21,12 @@ export default function PrivacyPage() {
           <article className={styles.article}>
             <section id="desktop">
               <h2>Desktop data</h2>
-              <p>Conversations, message search data, imported files, recordings, transcripts, generated skills, preferences, permission decisions, and diagnostics are stored on your Mac. Nexus does not operate a cloud database for this information.</p>
+              <p>Conversations, message search data, imported files, recordings, transcripts, generated skills, preferences, permission decisions, and diagnostics are stored on your device. Nexus does not operate a cloud database for this information.</p>
               <p>Use the in-app controls to choose retention, export local data and imported files, or delete local data. Optional personalization is off by default; when enabled, its inspectable notes are included in requests to the providers you choose.</p>
             </section>
             <section id="keys">
               <h2>Provider credentials</h2>
-              <p>OpenAI and Anthropic API keys are stored in macOS Keychain. They are used by the desktop main process to make requests and are excluded from local data exports and diagnostics. Removing a provider in Connections deletes that Keychain entry.</p>
+              <p>OpenAI and Anthropic API keys are stored through the operating system credential store. They are used by the desktop main process to make requests and are excluded from local data exports and diagnostics. Removing a provider in Connections deletes that credential-store entry.</p>
             </section>
             <section id="providers">
               <h2>External providers and tools</h2>
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
             </section>
             <section id="website">
               <h2>Website</h2>
-              <p>This marketing and documentation site does not set analytics cookies, collect API keys, or expose a prompt API. Vercel hosts the site and may process ordinary request data such as IP address, user agent, requested URL, and timestamps to deliver and secure the service under Vercel&apos;s policies.</p>
+              <p>This marketing and documentation site does not set analytics cookies, collect API keys, or expose a prompt API. Download matching reads browser platform and architecture hints locally; Nexus does not post them to analytics or a detection endpoint. Vercel hosts the site and may process ordinary request data such as IP address, user agent, requested URL, and timestamps to deliver and secure the service under Vercel&apos;s policies.</p>
             </section>
             <section id="contact">
               <h2>Questions and changes</h2>

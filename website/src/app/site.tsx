@@ -11,6 +11,7 @@ export function SiteHeader() {
         Nexus
       </Link>
       <nav aria-label="Site navigation">
+        <Link href="/download">Download</Link>
         <Link href="/docs">Docs</Link>
         <Link href="/security">Security</Link>
         <Link href="/changelog">Changelog</Link>
@@ -28,6 +29,7 @@ export function SiteFooter() {
         <strong>Nexus</strong>
       </div>
       <nav aria-label="Footer navigation">
+        <Link href="/download">Download</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/legal">Legal</Link>
         <Link href="/community">Community</Link>

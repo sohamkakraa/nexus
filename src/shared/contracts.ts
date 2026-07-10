@@ -105,12 +105,21 @@ export const FeedbackDraftSchema = z.object({
 }).strict()
 export type FeedbackDraft = z.infer<typeof FeedbackDraftSchema>
 
+export type PlatformCapabilities = {
+  os: 'macos' | 'windows' | 'linux'
+  architecture: 'arm64' | 'x64' | 'other'
+  credentialStore: string
+  systemControls: boolean
+  systemControlsMessage: string
+}
+
 export type AppSnapshot = {
   conversations: Conversation[]
   models: Model[]
   configuredProviders: ProviderId[]
   jobs: JobState[]
   skills: SkillDefinition[]
+  platform: PlatformCapabilities
 }
 
 export type NexusApi = {

@@ -53,6 +53,9 @@ export async function runApprovedSystemAction(
   action: 'open-app' | 'set-volume' | 'toggle-dark-mode',
   value?: string
 ): Promise<void> {
+  if (process.platform !== 'darwin') {
+    throw new Error('Apple Event system controls are available only on macOS. This action was not run.')
+  }
   let script: string
   let detail: string
   if (action === 'open-app') {

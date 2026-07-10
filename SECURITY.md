@@ -10,7 +10,7 @@ Do not open a public issue for an exploitable vulnerability.
 
 Use [GitHub private vulnerability reporting](https://github.com/sohamkakraa/nexus/security/advisories/new). Include:
 
-- affected version and macOS version
+- affected Nexus version, operating system, and processor architecture
 - impact and realistic attack scenario
 - minimal reproduction
 - whether API keys, local files, IPC, MCP, shell commands, Apple Events, or updates are involved
@@ -20,11 +20,14 @@ You should receive acknowledgement within 72 hours. We will coordinate disclosur
 
 ## Security boundaries
 
-- Provider keys are stored in macOS Keychain and owned by the Electron main process.
+- Provider keys are stored through `keytar` in macOS Keychain, Windows Credential
+  Manager, or a Secret Service-compatible Linux keyring and are owned by the
+  Electron main process.
 - The renderer is sandboxed, context-isolated, and has no Node integration.
 - IPC validates the sender, top frame, trusted renderer URL, and input schema.
 - Shell commands are parsed and executed without a shell.
-- MCP and macOS actions require visible approval.
+- MCP calls and supported system actions require visible approval. Apple Event
+  controls are disabled outside macOS.
 - Diagnostics redact provider-key patterns and exclude prompts/files.
 - The website is static and must never handle provider API keys.
 

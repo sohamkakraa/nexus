@@ -35,7 +35,14 @@ const EMPTY: AppSnapshot = {
   models: [],
   configuredProviders: [],
   jobs: [],
-  skills: []
+  skills: [],
+  platform: {
+    os: 'macos',
+    architecture: 'arm64',
+    credentialStore: 'macOS Keychain',
+    systemControls: true,
+    systemControlsMessage: 'Apple Events are available with approval for every action.'
+  }
 }
 
 export const PERSONAS: Record<PersonaId, PersonaScenario> = {
