@@ -16,12 +16,16 @@ export function listJobs(): JobState[] {
   return [...jobs.values()]
 }
 
-export function startResearchJob(query: string, depth: 'quick' | 'deep' | 'auto'): JobState {
+export function startResearchJob(
+  query: string,
+  depth: 'quick' | 'deep' | 'auto',
+  model: string
+): JobState {
   const activeResearch = [...jobs.values()].filter((job) => job.kind === 'research' && ['queued', 'running'].includes(job.status))
   if (activeResearch.length >= 2) throw new Error('At most two research jobs may run at once.')
   return createJob('research', `${depth === 'quick' ? 'Search' : 'Research'}: ${query.slice(0, 42)}`, async (signal) => {
     updateProgress(signal, 20)
-    const result = await research(query, depth, signal)
+    const result = await research(query, depth, model, signal)
     updateProgress(signal, 90)
     return result
   })

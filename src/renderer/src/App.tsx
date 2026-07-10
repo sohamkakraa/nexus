@@ -383,6 +383,26 @@ function Connections({ snapshot, onClose, onError }: { snapshot: AppSnapshot; on
       setBusy('')
     }
   }
+  async function refresh(provider: ProviderId): Promise<void> {
+    setBusy(provider)
+    try {
+      await window.nexus.discoverModels(provider)
+    } catch (reason) {
+      onError(messageOf(reason))
+    } finally {
+      setBusy('')
+    }
+  }
+  async function remove(provider: ProviderId): Promise<void> {
+    setBusy(provider)
+    try {
+      await window.nexus.removeProviderKey(provider)
+    } catch (reason) {
+      onError(messageOf(reason))
+    } finally {
+      setBusy('')
+    }
+  }
   return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal connections-modal" onMouseDown={(event) => event.stopPropagation()}>
     <div className="modal-head"><div><p className="eyebrow">Private by design</p><h2>Connect your models</h2></div><button className="icon-button" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
     <p className="modal-intro">Keys stay in macOS Keychain. Nexus sends content directly to the provider you choose.</p>
@@ -391,7 +411,7 @@ function Connections({ snapshot, onClose, onError }: { snapshot: AppSnapshot; on
       return <div className="provider-card" key={provider}>
         <div className={`provider-glyph ${provider}`}>{provider === 'openai' ? 'O' : 'A'}</div>
         <div className="provider-copy"><h3>{provider === 'openai' ? 'OpenAI' : 'Anthropic'}</h3><p>{connected ? `${snapshot.models.filter((model) => model.provider === provider).length} models available` : 'Add an API key to discover available models.'}</p></div>
-        {connected ? <button className="connected" onClick={() => void window.nexus.removeProviderKey(provider)}>Connected · remove</button> : <div className="key-entry"><KeyRound size={15} /><input type="password" value={keys[provider]} placeholder={provider === 'openai' ? 'sk-…' : 'sk-ant-…'} onChange={(event) => setKeys((current) => ({ ...current, [provider]: event.target.value }))} /><button disabled={!keys[provider] || busy === provider} onClick={() => void connect(provider)}>{busy === provider ? 'Testing…' : 'Connect'}</button></div>}
+        {connected ? <div className="connection-actions"><button className="connected" disabled={busy === provider} onClick={() => void refresh(provider)}>{busy === provider ? 'Checking…' : 'Connected · refresh'}</button><button disabled={busy === provider} onClick={() => void remove(provider)}>Remove</button></div> : <div className="key-entry"><KeyRound size={15} /><input type="password" value={keys[provider]} placeholder={provider === 'openai' ? 'sk-…' : 'sk-ant-…'} onChange={(event) => setKeys((current) => ({ ...current, [provider]: event.target.value }))} /><button disabled={!keys[provider] || busy === provider} onClick={() => void connect(provider)}>{busy === provider ? 'Testing…' : 'Connect'}</button></div>}
       </div>
     })}
     <div className="privacy-note"><span>01</span><div><strong>Local history</strong><p>Chats, files, and permissions remain on this Mac. No Nexus account required.</p></div></div>
