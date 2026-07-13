@@ -131,7 +131,7 @@ export function PreferenceStudio({ preferences, onChange, onReset }: {
         <ShieldCheck size={18} />
         <span><strong>Transparent adaptation</strong>Only explicit controls change this interface. Every choice is local, inspectable, and reversible.</span>
       </div>
-      <button onClick={() => setShowWhy((value) => !value)}>{showWhy ? 'Hide explanation' : 'Why this changed'}</button>
+      <button onClick={() => setShowWhy((value) => !value)}>{showWhy ? 'Hide explanation' : 'Explain my choices'}</button>
       {showWhy ? <ul>{explainPreferences(preferences).map((item) => <li key={item}>{item}</li>)}</ul> : null}
     </div>
   </section>

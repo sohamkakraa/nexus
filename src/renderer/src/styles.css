@@ -1357,6 +1357,14 @@ kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 4px; color
 .solo-note { margin: 0; color: var(--faint); font-size: 8px; }
 .workflow-context > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .workflow-context > div span { padding: 3px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--faint); font: 7px "SFMono-Regular", monospace; }
+.inspector > .advanced-tool-dock { padding: 0; border-bottom: 1px solid var(--line); }
+.advanced-tool-summary { display: flex; align-items: center; gap: 8px; padding: 14px 15px; cursor: pointer; color: var(--muted); list-style: none; }
+.advanced-tool-summary::-webkit-details-marker { display: none; }
+.advanced-tool-summary > span { display: grid; gap: 2px; }
+.advanced-tool-summary strong { color: var(--text); font-size: 9px; }
+.advanced-tool-summary small { color: var(--faint); font-size: 7px; font-weight: 500; }
+.advanced-tool-dock[open] > .advanced-tool-summary { border-bottom: 1px solid var(--line); }
+.advanced-tool-dock > .tool-dock { padding: 8px 15px 14px; }
 .tool-dock details { padding: 7px 0; border-top: 1px solid var(--line); }
 .tool-dock details:first-of-type { border-top: 0; }
 .tool-dock summary { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--muted); font-size: 8px; font-weight: 650; list-style: none; }
@@ -1435,6 +1443,9 @@ kbd { padding: 3px 5px; border: 1px solid var(--line); border-radius: 4px; color
 .privacy-note strong { color: var(--text); font-size: 9px; }
 .privacy-note p { margin: 3px 0 0; color: var(--faint); font-size: 8px; line-height: 1.45; }
 .connections-modal { max-height: min(900px, 92vh); }
+.connection-advanced { border-top: 1px solid var(--line); }
+.connection-advanced > summary { padding: 13px 22px; cursor: pointer; color: var(--muted); font-size: 8px; font-weight: 650; list-style-position: inside; }
+.connection-advanced[open] > summary { color: var(--text); }
 .data-controls { display: grid; gap: 12px; padding: 17px 22px; border-top: 1px solid var(--line); }
 .data-controls h3 { margin: 4px 0 0; font-size: 11px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; color: var(--muted); font-size: 8px; }
