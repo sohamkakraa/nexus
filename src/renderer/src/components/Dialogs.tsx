@@ -5,7 +5,8 @@ import type {
   Model,
   NexusApi,
   PrivacySettings,
-  ProviderId
+  ProviderId,
+  ReasoningEffort
 } from '../../../shared/contracts'
 import type { WorkflowDraft } from '../workflows'
 import { NexusMark } from './NexusMark'
@@ -222,6 +223,9 @@ export function CallPanel({ api, models, onClose, onError }: {
   const [connecting, setConnecting] = useState(false)
   const [saveTranscript, setSaveTranscript] = useState(false)
   const [model, setModel] = useState(models[0]?.id ?? '')
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort | undefined>(
+    models[0]?.reasoningEfforts?.includes('high') ? 'high' : models[0]?.reasoningEfforts?.[0]
+  )
   const [elapsed, setElapsed] = useState(0)
   const peerRef = useRef<RTCPeerConnection | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -255,7 +259,7 @@ export function CallPanel({ api, models, onClose, onError }: {
     if (!model) return
     setConnecting(true)
     try {
-      const session = await api.createRealtimeSession(model)
+      const session = await api.createRealtimeSession(model, reasoningEffort)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
       streamRef.current = stream
       const peer = new RTCPeerConnection()
@@ -326,7 +330,12 @@ export function CallPanel({ api, models, onClose, onError }: {
       <p>{connected ? 'Audio is using a short-lived provider connection.' : 'Starting requests microphone access and creates a provider session. Recording remains off unless selected.'}</p>
       {callError ? <div className="modal-error" role="alert">{callError}<button onClick={() => setCallError('')} aria-label="Dismiss voice error"><X size={13} /></button></div> : null}
       {!connected ? <div className="call-options">
-        <select aria-label="Realtime model" value={model} onChange={(event) => setModel(event.target.value)}><option value="">Choose a realtime model</option>{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <select aria-label="Realtime model" value={model} onChange={(event) => {
+          const next = models.find((item) => item.id === event.target.value)
+          setModel(event.target.value)
+          setReasoningEffort(next?.reasoningEfforts?.includes('high') ? 'high' : next?.reasoningEfforts?.[0])
+        }}><option value="">Choose a realtime model</option>{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        {models.find((item) => item.id === model)?.reasoningEfforts?.length ? <label>Thinking<select aria-label="Realtime reasoning effort" value={reasoningEffort} onChange={(event) => setReasoningEffort(event.target.value as ReasoningEffort)}>{models.find((item) => item.id === model)?.reasoningEfforts?.map((effort) => <option key={effort} value={effort}>{effort === 'xhigh' ? 'Extra high' : effort}</option>)}</select></label> : null}
         <label><input type="checkbox" checked={saveTranscript} onChange={(event) => setSaveTranscript(event.target.checked)} /> Save a local recording for transcription</label>
       </div> : null}
       <div className={connected ? 'wave active' : 'wave'}>{Array.from({ length: 24 }, (_, index) => <i key={index} style={{ animationDelay: `${index * 40}ms` }} />)}</div>

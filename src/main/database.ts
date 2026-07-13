@@ -15,6 +15,7 @@ export function openDatabase(): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, mode TEXT NOT NULL,
+      pinned INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS messages (
@@ -32,24 +33,32 @@ export function openDatabase(): void {
       pinned INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
     );
   `)
+  ensureConversationColumn('pinned', 'INTEGER NOT NULL DEFAULT 0')
+  ensureConversationColumn('archived', 'INTEGER NOT NULL DEFAULT 0')
 }
 
 export function listConversations(): Conversation[] {
-  const rows = db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all() as Array<Record<string, string>>
+  const rows = db.prepare('SELECT * FROM conversations ORDER BY archived ASC, pinned DESC, updated_at DESC').all() as Array<Record<string, string | number>>
   const messageStatement = db.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at')
   return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    mode: row.mode as Conversation['mode'],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    messages: (messageStatement.all(row.id) as Array<Record<string, string>>).map(mapMessage)
+    id: String(row.id),
+    title: String(row.title),
+    mode: String(row.mode) as Conversation['mode'],
+    pinned: Boolean(row.pinned),
+    archived: Boolean(row.archived),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    messages: (messageStatement.all(String(row.id)) as Array<Record<string, string>>).map(mapMessage)
   }))
 }
 
 export function insertConversation(conversation: Conversation): void {
-  db.prepare(`INSERT INTO conversations (id, title, mode, created_at, updated_at)
-    VALUES (@id, @title, @mode, @createdAt, @updatedAt)`).run(conversation)
+  db.prepare(`INSERT INTO conversations (id, title, mode, pinned, archived, created_at, updated_at)
+    VALUES (@id, @title, @mode, @pinned, @archived, @createdAt, @updatedAt)`).run({
+      ...conversation,
+      pinned: conversation.pinned ? 1 : 0,
+      archived: conversation.archived ? 1 : 0
+    })
 }
 
 export function insertMessage(message: Message): void {
@@ -69,6 +78,35 @@ export function insertMessage(message: Message): void {
 
 export function renameConversation(id: string, title: string): void {
   db.prepare('UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?').run(title, new Date().toISOString(), id)
+}
+
+export function setConversationPinned(id: string, pinned: boolean): void {
+  db.prepare('UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?').run(
+    pinned ? 1 : 0,
+    new Date().toISOString(),
+    id
+  )
+}
+
+export function setConversationArchived(id: string, archived: boolean): void {
+  db.prepare('UPDATE conversations SET archived = ?, pinned = CASE WHEN ? = 1 THEN 0 ELSE pinned END, updated_at = ? WHERE id = ?').run(
+    archived ? 1 : 0,
+    archived ? 1 : 0,
+    new Date().toISOString(),
+    id
+  )
+}
+
+export function deleteConversation(id: string): string[] {
+  const messageRows = db.prepare('SELECT attachments_json FROM messages WHERE conversation_id = ?').all(id) as Array<{ attachments_json: string }>
+  const attachmentIds = new Set(messageRows.flatMap((row) => safeAttachmentIds(row.attachments_json)))
+  const transaction = db.transaction(() => {
+    db.prepare('DELETE FROM message_search WHERE message_id IN (SELECT id FROM messages WHERE conversation_id = ?)').run(id)
+    db.prepare('DELETE FROM memories WHERE conversation_id = ?').run(id)
+    db.prepare('DELETE FROM conversations WHERE id = ?').run(id)
+  })
+  transaction()
+  return removeUnusedAttachments(attachmentIds)
 }
 
 export function saveAttachment(attachment: Attachment): void {
@@ -169,6 +207,13 @@ function mapMessage(row: Record<string, string>): Message {
     author: row.author ?? undefined,
     createdAt: row.created_at,
     attachments: JSON.parse(row.attachments_json) as Attachment[]
+  }
+}
+
+function ensureConversationColumn(name: 'pinned' | 'archived', definition: string): void {
+  const columns = db.pragma('table_info(conversations)') as Array<{ name: string }>
+  if (!columns.some((column) => column.name === name)) {
+    db.exec(`ALTER TABLE conversations ADD COLUMN ${name} ${definition}`)
   }
 }
 

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
-import type { Attachment, Model, ProviderId } from '../shared/contracts'
+import type { Attachment, Model, ProviderId, ReasoningEffort } from '../shared/contracts'
 import { curateProviderModels } from '../shared/models'
 import { ProviderConnectionError, providerConnectionError } from '../shared/provider-errors'
 import { attachmentPayload } from './files'
@@ -10,6 +10,8 @@ export type GenerateOptions = {
   model: string
   system: string
   prompt: string
+  reasoningEffort?: ReasoningEffort
+  reasoningMode?: 'standard' | 'pro'
   attachments?: Attachment[]
   signal?: AbortSignal
 }
@@ -48,8 +50,9 @@ export async function generateStreaming(
       const stream = await new OpenAI({ apiKey: key }).responses.stream({
         model: options.model,
         instructions: options.system,
-        input: options.prompt
-      }, { signal: options.signal })
+        input: options.prompt,
+        ...(reasoningConfig(options) ? { reasoning: reasoningConfig(options) } : {})
+      } as never, { signal: options.signal })
       let complete = ''
       for await (const event of stream) {
         if (event.type === 'response.output_text.delta') {
@@ -136,13 +139,19 @@ export async function research(
   return response.output_text.trim()
 }
 
-export async function createRealtimeSession(model: string): Promise<{ clientSecret: string; model: string }> {
+export async function createRealtimeSession(model: string, reasoningEffort?: ReasoningEffort): Promise<{ clientSecret: string; model: string }> {
   const key = await requireKey('openai')
   return providerRequest('openai', async () => {
     const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: { type: 'realtime', model } })
+      body: JSON.stringify({
+        session: {
+          type: 'realtime',
+          model,
+          ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
+        }
+      })
     })
     const payload = await response.json() as { value?: string; client_secret?: { value?: string }; error?: { message?: string } }
     if (!response.ok) {
@@ -172,7 +181,8 @@ async function generateOpenAI(key: string, options: GenerateOptions): Promise<st
     model: options.model,
     instructions: options.system,
     input: [{ role: 'user', content }] as never,
-  }, { signal: options.signal })
+    ...(reasoningConfig(options) ? { reasoning: reasoningConfig(options) } : {})
+  } as never, { signal: options.signal })
   return response.output_text.trim()
 }
 
@@ -221,4 +231,12 @@ async function providerRequest<T>(
 
 function isAbortError(reason: unknown): boolean {
   return Boolean(reason && typeof reason === 'object' && Reflect.get(reason, 'name') === 'AbortError')
+}
+
+function reasoningConfig(options: GenerateOptions): Record<string, string> | undefined {
+  if (!options.reasoningEffort && !options.reasoningMode) return undefined
+  return {
+    ...(options.reasoningEffort ? { effort: options.reasoningEffort } : {}),
+    ...(options.reasoningMode ? { mode: options.reasoningMode } : {})
+  }
 }

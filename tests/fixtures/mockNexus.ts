@@ -74,6 +74,8 @@ export function createMockNexus(scenario: PersonaScenario): MockNexus {
         id: nextId('work'),
         title: 'New conversation',
         mode,
+        pinned: false,
+        archived: false,
         createdAt: now,
         updatedAt: now,
         messages: []
@@ -81,6 +83,26 @@ export function createMockNexus(scenario: PersonaScenario): MockNexus {
       current.conversations.unshift(conversation)
       emit()
       return structuredClone(conversation)
+    },
+    async setConversationPinned(id, pinned) {
+      record('setConversationPinned', id, pinned)
+      const conversation = current.conversations.find((item) => item.id === id)
+      if (conversation) conversation.pinned = pinned
+      emit()
+    },
+    async setConversationArchived(id, archived) {
+      record('setConversationArchived', id, archived)
+      const conversation = current.conversations.find((item) => item.id === id)
+      if (conversation) {
+        conversation.archived = archived
+        if (archived) conversation.pinned = false
+      }
+      emit()
+    },
+    async deleteConversation(id) {
+      record('deleteConversation', id)
+      current.conversations = current.conversations.filter((item) => item.id !== id)
+      emit()
     },
     async sendMessage(request: ChatRequest) {
       record('sendMessage', request)

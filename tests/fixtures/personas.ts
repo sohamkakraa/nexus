@@ -17,15 +17,19 @@ export type PersonaScenario = {
 
 const MODELS: Model[] = [
   {
-    id: 'gpt-5.2',
+    id: 'gpt-5.6-sol',
     provider: 'openai',
-    label: 'GPT-5.2',
-    capabilities: ['text', 'vision', 'image', 'realtime', 'transcription', 'tools', 'research']
+    label: 'GPT-5.6 Sol',
+    capabilities: ['text', 'vision', 'image', 'realtime', 'transcription', 'tools', 'research'],
+    contextWindow: 1_050_000,
+    maxOutputTokens: 128_000,
+    reasoningEfforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+    reasoningModes: ['standard', 'pro']
   },
   {
-    id: 'claude-opus-4-5',
+    id: 'claude-sonnet-5',
     provider: 'anthropic',
-    label: 'Claude Opus 4.5',
+    label: 'Claude Sonnet 5',
     capabilities: ['text', 'vision', 'tools']
   }
 ]
@@ -70,6 +74,16 @@ export const PERSONAS: Record<PersonaId, PersonaScenario> = {
       ...EMPTY,
       models: MODELS,
       configuredProviders: ['openai', 'anthropic'],
+      conversations: [{
+        id: 'work-existing',
+        title: 'Existing local conversation',
+        mode: 'council',
+        pinned: false,
+        archived: false,
+        createdAt: '2026-07-10T10:00:00.000Z',
+        updatedAt: '2026-07-10T10:00:00.000Z',
+        messages: []
+      }],
       jobs: [{ id: 'job-1', kind: 'tool', label: 'Index repository', status: 'running', progress: 42 }]
     }
   },

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Accessibility, Check, ChevronRight, Database, Gauge, KeyRound, Link2,
+  Accessibility, Check, ChevronRight, Database, Gauge, Link2,
   Mic, Network, Palette, Paperclip, RotateCcw, ShieldCheck, SlidersHorizontal,
   Sparkles, SquareTerminal, X
 } from 'lucide-react'
@@ -105,13 +105,6 @@ export function PreferenceStudio({ preferences, onChange, onReset }: {
           value={preferences.inspectorDefault}
           options={[['open', 'Open'], ['closed', 'Closed']]}
           onChange={(value) => update('inspectorDefault', value)}
-        />
-      </PreferenceGroup>
-      <PreferenceGroup icon={<KeyRound size={17} />} title="Model badges" description="Control how much provider identity appears beside Council contributions.">
-        <Segmented
-          value={preferences.modelBadges}
-          options={[['model', 'Model'], ['provider', 'Provider'], ['minimal', 'Minimal']]}
-          onChange={(value) => update('modelBadges', value)}
         />
       </PreferenceGroup>
       <PreferenceGroup icon={<Sparkles size={17} />} title="Suggested workflows" description="Show or hide workflow invitations on an empty table.">

@@ -17,12 +17,13 @@ test('opens the production Electron Council workspace', async () => {
   })
   try {
     const page = await app.firstWindow()
+    let createdId = ''
     await test.step('render the workspace', async () => {
       await expect(page).toHaveTitle('Nexus')
       await expect(page.getByTestId('app')).toBeVisible()
     })
     await test.step('inspect provider onboarding', async () => {
-      await expect(page.getByRole('heading', { name: /Set(?:ting)? the table/ })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Start with a question.' })).toBeVisible()
       await page.getByRole('button', { name: 'Connections' }).click()
       await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
       await expect(page.getByText(/Connecting checks the provider/)).toBeVisible()
@@ -37,14 +38,28 @@ test('opens the production Electron Council workspace', async () => {
         ])
       })
       if (!outcome.startsWith('created:')) throw new Error(`Conversation IPC ${outcome}`)
+      createdId = outcome.slice('created:'.length)
       await expect(page.getByRole('heading', { name: 'New conversation' })).toBeVisible()
     })
+    await test.step('persist conversation history actions', async () => {
+      const state = await page.evaluate(async (id) => {
+        const api = (window as unknown as { nexus: {
+          setConversationPinned(id: string, pinned: boolean): Promise<void>
+          setConversationArchived(id: string, archived: boolean): Promise<void>
+          getSnapshot(): Promise<{ conversations: Array<{ id: string; pinned: boolean; archived: boolean }> }>
+        } }).nexus
+        await api.setConversationPinned(id, true)
+        await api.setConversationArchived(id, true)
+        return (await api.getSnapshot()).conversations.find((conversation) => conversation.id === id)
+      }, createdId)
+      expect(state).toMatchObject({ pinned: false, archived: true })
+    })
     await test.step('prepare a Council workflow without provider calls', async () => {
-      await page.getByRole('button', { name: /New work item/ }).click()
+      await page.locator('.new-work').click()
       await expect(page.getByRole('heading', { name: 'Choose a working method' })).toBeVisible()
       await page.getByRole('button', { name: /Council decision/ }).click()
-      await expect(page.getByRole('textbox', { name: 'Working brief' })).toHaveValue(/Decision to make/)
-      await expect(page.getByRole('button', { name: /Send brief/ })).toBeDisabled()
+      await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue(/Decision to make/)
+      await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled()
     })
   } finally {
     await app.close()

@@ -19,8 +19,8 @@ describe('mocked provider scenarios', () => {
       conversationId: conversation.id,
       content: 'Compare both paths.',
       mode: 'council',
-      primaryModel: 'gpt-5.2',
-      secondaryModel: 'claude-opus-4-5',
+      primaryModel: 'gpt-5.6-sol',
+      secondaryModel: 'claude-sonnet-5',
       attachmentIds: []
     })
 
@@ -39,8 +39,8 @@ describe('mocked provider scenarios', () => {
       conversationId: conversation.id,
       content: 'This should fail locally.',
       mode: 'council',
-      primaryModel: 'gpt-5.2',
-      secondaryModel: 'claude-opus-4-5',
+      primaryModel: 'gpt-5.6-sol',
+      secondaryModel: 'claude-sonnet-5',
       attachmentIds: []
     })).rejects.toThrow('Provider is unreachable')
     expect(fetchSpy).not.toHaveBeenCalled()

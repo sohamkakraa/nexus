@@ -27,7 +27,13 @@ export async function runChat(
   const content = request.mode === 'council' && request.secondaryModel
     ? await runCouncil(request, context, attachments, system, signal, onDelta)
     : await generateStreaming(providerFor(request.primaryModel), {
-      model: request.primaryModel, system, prompt: context, attachments, signal
+      model: request.primaryModel,
+      system,
+      prompt: context,
+      reasoningEffort: request.primaryReasoningEffort,
+      reasoningMode: request.reasoningMode,
+      attachments,
+      signal
     }, onDelta)
 
   const assistantMessage: Message = {
@@ -55,11 +61,13 @@ async function runCouncil(
   const [firstDraft, secondDraft] = await Promise.all([
     generate(providerFor(firstModel), {
       model: firstModel, system: `${system}\nCreate an independent proposed answer for another expert to review.`,
-      prompt: context, attachments, signal
+      prompt: context, reasoningEffort: request.primaryReasoningEffort, reasoningMode: request.reasoningMode,
+      attachments, signal
     }),
     generate(providerFor(secondModel), {
       model: secondModel, system: `${system}\nCreate an independent proposed answer for another expert to review.`,
-      prompt: context, attachments, signal
+      prompt: context, reasoningEffort: request.secondaryReasoningEffort, reasoningMode: request.reasoningMode,
+      attachments, signal
     })
   ])
 
@@ -69,13 +77,16 @@ async function runCouncil(
   const critiquePrompt = `${context}\n\nTwo proposed answers:\nA (${firstModel}): ${firstDraft}\n\nB (${secondModel}): ${secondDraft}
 \nCompare the proposals. List only concrete agreements, conflicts, and corrections. Do not discuss hidden reasoning.`
   const critique = await generate(providerFor(secondModel), {
-    model: secondModel, system, prompt: critiquePrompt, signal
+    model: secondModel, system, prompt: critiquePrompt,
+    reasoningEffort: request.secondaryReasoningEffort, reasoningMode: request.reasoningMode, signal
   })
 
   return generateStreaming(providerFor(firstModel), {
     model: firstModel,
     system: `${system}\nAct as editor for a two-model council. Return one polished answer. Attribute material disagreements briefly when they remain.`,
     prompt: `${critiquePrompt}\n\nReviewer notes:\n${critique}\n\nProduce the final response now.`,
+    reasoningEffort: request.primaryReasoningEffort,
+    reasoningMode: request.reasoningMode,
     signal
   }, onDelta)
 }
