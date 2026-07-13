@@ -221,7 +221,7 @@ jobs:
             --out release-assets
       - name: Attest build provenance
         continue-on-error: true
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: release-assets/*
       - uses: actions/upload-artifact@v5
@@ -275,7 +275,7 @@ jobs:
         run: node scripts/write-release-checksums.mjs release-assets
       - name: Attest assembled release bundle
         continue-on-error: true
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             release-assets/release-manifest.json
