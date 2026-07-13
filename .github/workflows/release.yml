@@ -298,7 +298,7 @@ jobs:
           retention-days: 30
       - name: Publish signed GitHub release
         if: steps.manifest.outputs.publishable == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Nexus ${{ needs.verify-tag.outputs.version }}${{ steps.manifest.outputs.channel == 'prerelease' && ' — prerelease' || '' }}
           prerelease: ${{ steps.manifest.outputs.channel == 'prerelease' }}
