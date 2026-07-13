@@ -12,6 +12,7 @@ import { ContextInspector } from './components/ContextInspector'
 import { CallPanel, CommandPalette, Connections, WorkflowEditor } from './components/Dialogs'
 import { NexusMark } from './components/NexusMark'
 import { DiagnosticsSurface, PreferenceStudio, WorkflowLibrary } from './components/WorkspaceSurfaces'
+import { messageOf } from './errors'
 import { loadPreferences, resetPreferences, savePreferences, type WorkspacePreferences } from './preferences'
 import { configureWorkflow, WORKFLOWS, type WorkflowDefinition, type WorkflowDraft } from './workflows'
 
@@ -555,11 +556,6 @@ function defaultReasoning(model?: Model): ReasoningEffort | undefined {
 function formatTokens(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2).replace(/\.?0+$/, '')}M`
   return `${Math.round(tokens / 1_000)}K`
-}
-
-function messageOf(reason: unknown): string {
-  const value = reason instanceof Error ? reason.message : String(reason)
-  return value.replace(/^Error invoking remote method '[^']+': Error: /, '')
 }
 
 function relativeTime(value: string): string {

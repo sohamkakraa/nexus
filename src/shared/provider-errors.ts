@@ -16,6 +16,7 @@ export class ProviderConnectionError extends Error {
 
 export function providerConnectionError(provider: ProviderId, reason: unknown): ProviderConnectionError {
   const name = provider === 'openai' ? 'OpenAI' : 'Anthropic'
+  const consoleName = provider === 'openai' ? 'platform.openai.com' : 'console.anthropic.com'
   const status = errorStatus(reason)
   const details = errorDetails(reason)
 
@@ -23,7 +24,7 @@ export function providerConnectionError(provider: ProviderId, reason: unknown): 
     return new ProviderConnectionError(
       provider,
       'authentication',
-      `${name} authentication failed. Remove ${name} in Connections, then reconnect with a valid API key.`
+      `${name} rejected this API key. Nexus will not delete a previously saved key. Verify that it is an API key from ${consoleName}—not a login, subscription, or OAuth token—then replace or refresh it in Connections.`
     )
   }
   if (status === 403 || status === 404 || /model.{0,30}(not found|unavailable|access)|permission/.test(details)) {

@@ -4,7 +4,7 @@ import type { Attachment, Model, ProviderId, ReasoningEffort } from '../shared/c
 import { curateProviderModels } from '../shared/models'
 import { ProviderConnectionError, providerConnectionError } from '../shared/provider-errors'
 import { attachmentPayload } from './files'
-import { getProviderKey, removeProviderKey } from './secrets'
+import { getProviderKey } from './secrets'
 
 export type GenerateOptions = {
   model: string
@@ -23,7 +23,7 @@ export async function discoverProviderModels(provider: ProviderId, candidateKey?
       ? (await new OpenAI({ apiKey: key }).models.list()).data.map((entry) => entry.id)
       : (await new Anthropic({ apiKey: key }).models.list({ limit: 100 })).data.map((entry) => entry.id)
     return curateProviderModels(provider, ids)
-  }, candidateKey === undefined)
+  })
 }
 
 export async function generate(provider: ProviderId, options: GenerateOptions): Promise<string> {
@@ -216,15 +216,13 @@ async function requireKey(provider: ProviderId): Promise<string> {
 
 async function providerRequest<T>(
   provider: ProviderId,
-  operation: () => Promise<T>,
-  removeRejectedStoredKey = true
+  operation: () => Promise<T>
 ): Promise<T> {
   try {
     return await operation()
   } catch (reason) {
     if (isAbortError(reason)) throw reason
     const error = reason instanceof ProviderConnectionError ? reason : providerConnectionError(provider, reason)
-    if (removeRejectedStoredKey && error.code === 'authentication') await removeProviderKey(provider)
     throw error
   }
 }
