@@ -8,6 +8,7 @@ import type { AppSnapshot, NexusApi, ProviderId } from '../../../shared/contract
 import {
   DEFAULT_PREFERENCES, explainPreferences, type AccentPalette, type WorkspacePreferences
 } from '../preferences'
+import { messageOf } from '../errors'
 import { WORKFLOWS, type WorkflowDefinition } from '../workflows'
 
 export function WorkflowLibrary({ onChoose, onClose }: {
@@ -332,11 +333,6 @@ function DiagnosticResultView({ result }: { result: DiagnosticResult }): React.J
   return <p className={`diagnostic-result ${result.status}`} aria-live="polite">
     <i />{result.detail}
   </p>
-}
-
-function messageOf(reason: unknown): string {
-  const value = reason instanceof Error ? reason.message : String(reason)
-  return value.replace(/^Error invoking remote method '[^']+': Error: /, '')
 }
 
 export { DEFAULT_PREFERENCES }

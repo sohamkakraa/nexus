@@ -148,6 +148,20 @@ test('history can be pinned, archived, restored, and deleted', async () => {
   }
 })
 
+test('a connected provider key can be replaced without removing it first', async () => {
+  const harness = await launchHarness('researcher')
+  try {
+    await harness.page.getByRole('button', { name: 'Connections' }).click()
+    const anthropic = harness.page.locator('.provider-card').filter({ hasText: 'Anthropic' })
+    await anthropic.getByRole('button', { name: 'Replace key' }).click()
+    await anthropic.getByLabel('anthropic API key').fill('sk-ant-replacement-key-that-is-long-enough')
+    await anthropic.getByRole('button', { name: 'Verify & replace' }).click()
+    await expect(anthropic.getByRole('button', { name: /Connected/ })).toBeVisible()
+  } finally {
+    await harness.close()
+  }
+})
+
 test('Council stays unavailable until both providers have distinct models', async () => {
   const harness = await launchHarness('privacy')
   try {

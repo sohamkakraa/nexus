@@ -9,6 +9,7 @@ import type {
   ReasoningEffort
 } from '../../../shared/contracts'
 import type { WorkflowDraft } from '../workflows'
+import { messageOf } from '../errors'
 import { NexusMark } from './NexusMark'
 
 export function WorkflowEditor({ workflow, onSave, onClose }: {
@@ -56,6 +57,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
 }): React.JSX.Element {
   const [keys, setKeys] = useState<Record<ProviderId, string>>({ openai: '', anthropic: '' })
   const [busy, setBusy] = useState<ProviderId | ''>('')
+  const [replacing, setReplacing] = useState<ProviderId | ''>('')
   const [privacy, setPrivacy] = useState<PrivacySettings>({
     historyRetentionDays: 0,
     personalizationEnabled: false,
@@ -92,6 +94,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
     try {
       await api.saveProviderKey(provider, keys[provider])
       setKeys((current) => ({ ...current, [provider]: '' }))
+      setReplacing('')
     } catch (reason) {
       reportError(reason)
     } finally {
@@ -137,12 +140,16 @@ export function Connections({ api, snapshot, onClose, onError }: {
             <h3>{provider === 'openai' ? 'OpenAI' : 'Anthropic'}</h3>
             <p>{connected ? `${snapshot.models.filter((model) => model.provider === provider).length} models mapped` : 'Add an API key to discover available models.'}</p>
           </div>
-          {connected
+          {connected && replacing !== provider
             ? <div className="connection-actions">
                 <button className="connected" disabled={busy === provider} onClick={() => void refresh(provider)}>{busy === provider ? 'Checking…' : 'Connected · refresh'}</button>
+                <button disabled={busy === provider} onClick={() => setReplacing(provider)}>Replace key</button>
                 <button disabled={busy === provider} onClick={() => void remove(provider)}>Remove</button>
               </div>
-            : <div className="key-entry"><KeyRound size={15} /><input aria-label={`${provider} API key`} type="password" value={keys[provider]} placeholder={provider === 'openai' ? 'sk-…' : 'sk-ant-…'} onChange={(event) => setKeys((current) => ({ ...current, [provider]: event.target.value }))} /><button disabled={!keys[provider] || busy === provider} onClick={() => void connect(provider)}>{busy === provider ? 'Checking…' : 'Connect'}</button></div>}
+            : <div className="key-entry"><KeyRound size={15} /><input aria-label={`${provider} API key`} type="password" value={keys[provider]} placeholder={provider === 'openai' ? 'sk-…' : 'sk-ant-…'} onChange={(event) => setKeys((current) => ({ ...current, [provider]: event.target.value }))} />{connected ? <button onClick={() => {
+              setReplacing('')
+              setKeys((current) => ({ ...current, [provider]: '' }))
+            }}>Cancel</button> : null}<button disabled={!keys[provider] || busy === provider} onClick={() => void connect(provider)}>{busy === provider ? 'Checking…' : connected ? 'Verify & replace' : 'Connect'}</button></div>}
         </div>
       })}
       <div className="privacy-note"><ShieldCheck size={17} /><div><strong>What stays local</strong><p>Work, imported files, preferences, and permission decisions remain on this device. Only requests you run go to the connection you choose.</p></div></div>
@@ -379,11 +386,6 @@ function useDialogFocus(onClose: () => void): React.RefObject<HTMLDivElement | n
     }
   }, [onClose])
   return dialogRef
-}
-
-function messageOf(reason: unknown): string {
-  const value = reason instanceof Error ? reason.message : String(reason)
-  return value.replace(/^Error invoking remote method '[^']+': Error: /, '')
 }
 
 function formatDuration(seconds: number): string {

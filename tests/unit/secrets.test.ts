@@ -32,7 +32,7 @@ describe('provider credential persistence', () => {
     expect(keytar.deletePassword).not.toHaveBeenCalled()
   })
 
-  it('removes the same rejected key left by an earlier version', async () => {
+  it('never deletes an existing key when replacement validation fails', async () => {
     keytar.getPassword.mockResolvedValue(candidate)
 
     await expect(setProviderKey(
@@ -42,7 +42,7 @@ describe('provider credential persistence', () => {
     )).rejects.toThrow('authentication failed')
 
     expect(keytar.setPassword).not.toHaveBeenCalled()
-    expect(keytar.deletePassword).toHaveBeenCalledWith('com.nexus.desktop', 'anthropic')
+    expect(keytar.deletePassword).not.toHaveBeenCalled()
   })
 
   it('writes a credential only after the provider accepts it', async () => {

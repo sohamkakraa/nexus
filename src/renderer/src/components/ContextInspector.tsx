@@ -10,6 +10,7 @@ import type {
   PlatformCapabilities
 } from '../../../shared/contracts'
 import type { WorkflowDraft } from '../workflows'
+import { messageOf } from '../errors'
 
 export function ContextInspector({ api, platform, workflow, jobs, imageModels, onError, onClose }: {
   api: NexusApi
@@ -114,9 +115,4 @@ export function ContextInspector({ api, platform, workflow, jobs, imageModels, o
       </div>)}
     </section>
   </aside>
-}
-
-function messageOf(reason: unknown): string {
-  const value = reason instanceof Error ? reason.message : String(reason)
-  return value.replace(/^Error invoking remote method '[^']+': Error: /, '')
 }

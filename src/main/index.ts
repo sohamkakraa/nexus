@@ -120,8 +120,6 @@ function registerIpc(): void {
       return discovered
     } catch (error) {
       if (error instanceof ProviderConnectionError && error.code === 'authentication') {
-        await removeProviderKey(provider)
-        configuredProviderIds.delete(provider)
         replaceProviderModels(provider, [])
         await broadcastSnapshot()
       }
@@ -178,8 +176,6 @@ function registerIpc(): void {
       return message
     } catch (error) {
       if (error instanceof ProviderConnectionError && error.code === 'authentication') {
-        await removeProviderKey(error.provider)
-        configuredProviderIds.delete(error.provider)
         replaceProviderModels(error.provider, [])
         await broadcastSnapshot()
       }
@@ -335,10 +331,8 @@ async function restoreProviderModels(): Promise<void> {
       replaceProviderModels(provider, await discoverProviderModels(provider, credentials[provider]))
     } catch (error) {
       if (error instanceof ProviderConnectionError && error.code === 'authentication') {
-        await removeProviderKey(provider)
-        configuredProviderIds.delete(provider)
         replaceProviderModels(provider, [])
-        await diagnostic('provider-key-rejected', { provider })
+        await diagnostic('provider-authentication-failed', { provider })
       } else {
         await diagnostic('provider-model-discovery-failed', { provider })
       }

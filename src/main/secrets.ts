@@ -12,14 +12,7 @@ export async function setProviderKey<T>(
 ): Promise<T> {
   const normalized = key.trim()
   if (normalized.length < 20 || /\s/.test(normalized)) throw new Error('The API key format is not valid.')
-  const existing = await getProviderKey(provider)
-  let result: T
-  try {
-    result = await testConnection(normalized)
-  } catch (error) {
-    if (existing === normalized) await removeProviderKey(provider)
-    throw error
-  }
+  const result = await testConnection(normalized)
   try {
     await keytar.setPassword(SERVICE, provider, normalized)
     credentialCache[provider] = normalized
