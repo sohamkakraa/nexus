@@ -72,7 +72,10 @@ test('researcher configures and edits a guided workflow safely', async () => {
     await expect(harness.page.getByRole('button', { name: /Custom workflow/ })).toBeVisible()
     await harness.page.getByRole('button', { name: /Research brief/ }).click()
     await expect(harness.page.getByRole('textbox', { name: 'Working brief' })).toHaveValue(/Research question:/)
-    await expect(harness.page.getByText('Two models → one synthesis')).toBeVisible()
+    await expect(harness.page.getByText('OpenAI + Anthropic → one synthesis')).toBeVisible()
+    expect(await harness.page.evaluate(() => (
+      window as unknown as { __nexusMockCalls: Array<{ method: string }> }
+    ).__nexusMockCalls.some((call) => call.method === 'createConversation'))).toBe(true)
     await expect(harness.page.getByRole('combobox', { name: /Challenger/ })).toHaveValue('claude-opus-4-5')
     await harness.page.getByRole('button', { name: 'Edit method' }).click()
     await harness.page.getByLabel('Workflow name').fill('Evidence review')
@@ -103,6 +106,19 @@ test('power user choices persist and remain explainable', async () => {
     await harness.page.reload()
     await expect(harness.page.getByTestId('app')).toHaveAttribute('data-density', 'compact')
     await expect(harness.page.getByTestId('app')).toHaveAttribute('data-emphasis', 'context')
+    expect(harness.externalRequests).toEqual([])
+  } finally {
+    await harness.close()
+  }
+})
+
+test('Council stays unavailable until both providers have distinct models', async () => {
+  const harness = await launchHarness('privacy')
+  try {
+    await harness.page.getByRole('button', { name: /Choose a workflow/ }).click()
+    await harness.page.getByRole('button', { name: /Council decision/ }).click()
+    await expect(harness.page.getByText('Connect both providers for Council')).toBeVisible()
+    await expect(harness.page.getByRole('button', { name: /Send brief/ })).toBeDisabled()
     expect(harness.externalRequests).toEqual([])
   } finally {
     await harness.close()

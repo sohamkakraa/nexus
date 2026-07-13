@@ -34,13 +34,9 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
   const [terminalOutput, setTerminalOutput] = useState('')
   const [connectorUrl, setConnectorUrl] = useState('')
   const [connectorTools, setConnectorTools] = useState<string[]>([])
-  const openai = models.filter((model) => model.provider === 'openai')
-  const anthropic = models.filter((model) => model.provider === 'anthropic')
   const primaryProvider = models.find((model) => model.id === primary)?.provider
   const crossProviderModels = models.filter((model) => model.id !== primary && model.provider !== primaryProvider)
-  const secondaryModels = crossProviderModels.length
-    ? crossProviderModels
-    : primaryProvider === 'openai' ? anthropic : openai.length ? openai : models.filter((model) => model.id !== primary)
+  const secondaryModels = crossProviderModels
   const advancedWorkflow = ['research', 'image', 'terminal', 'connector'].includes(workflow?.id ?? '')
 
   return <aside className="inspector" aria-label="Context inspector">
@@ -135,6 +131,7 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
         {job.status === 'running' || job.status === 'queued'
           ? <button className="cancel-job" onClick={() => void api.cancelJob(job.id).catch((reason) => onError(messageOf(reason)))}>Cancel job</button>
           : null}
+        {job.error ? <p className="job-error" role="alert">{job.error}</p> : null}
         {job.result ? <details><summary>Open result</summary>{job.kind === 'image' ? <img className="job-image" src={job.result} alt={job.label} /> : <p>{job.result}</p>}</details> : null}
       </div>)}
     </section>

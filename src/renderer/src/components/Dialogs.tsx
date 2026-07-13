@@ -64,10 +64,16 @@ export function Connections({ api, snapshot, onClose, onError }: {
   const [feedbackSummary, setFeedbackSummary] = useState('')
   const [includeDiagnostics, setIncludeDiagnostics] = useState(false)
   const [feedbackPreview, setFeedbackPreview] = useState('')
+  const [connectionError, setConnectionError] = useState('')
   const dialogRef = useDialogFocus(onClose)
+  const reportError = (reason: unknown): void => {
+    const message = messageOf(reason)
+    setConnectionError(message)
+    onError(message)
+  }
 
   useEffect(() => {
-    void api.getPrivacySettings().then(setPrivacy).catch((reason) => onError(messageOf(reason)))
+    void api.getPrivacySettings().then(setPrivacy).catch(reportError)
   }, [api, onError])
 
   async function savePrivacy(patch: Partial<PrivacySettings>): Promise<void> {
@@ -76,7 +82,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
     try {
       setPrivacy(await api.updatePrivacySettings(next))
     } catch (reason) {
-      onError(messageOf(reason))
+      reportError(reason)
     }
   }
 
@@ -86,7 +92,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
       await api.saveProviderKey(provider, keys[provider])
       setKeys((current) => ({ ...current, [provider]: '' }))
     } catch (reason) {
-      onError(messageOf(reason))
+      reportError(reason)
     } finally {
       setBusy('')
     }
@@ -97,7 +103,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
     try {
       await api.discoverModels(provider)
     } catch (reason) {
-      onError(messageOf(reason))
+      reportError(reason)
     } finally {
       setBusy('')
     }
@@ -108,7 +114,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
     try {
       await api.removeProviderKey(provider)
     } catch (reason) {
-      onError(messageOf(reason))
+      reportError(reason)
     } finally {
       setBusy('')
     }
@@ -121,6 +127,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
         <button className="icon-button" onClick={onClose} aria-label="Close connections"><X size={18} /></button>
       </div>
       <p className="modal-intro">Keys are stored in {snapshot.platform.credentialStore}. Connecting checks the provider’s model list; it does not make a generation request.</p>
+      {connectionError ? <div className="modal-error" role="alert">{connectionError}<button onClick={() => setConnectionError('')} aria-label="Dismiss connection error"><X size={13} /></button></div> : null}
       {(['openai', 'anthropic'] as ProviderId[]).map((provider) => {
         const connected = snapshot.configuredProviders.includes(provider)
         return <div className="provider-card" key={provider}>
@@ -163,8 +170,8 @@ export function Connections({ api, snapshot, onClose, onError }: {
           <div><button onClick={() => void savePrivacy({ personalizationNotes: privacy.personalizationNotes })}>Save notes</button><button onClick={() => void savePrivacy({ personalizationNotes: '' })}>Delete notes</button></div>
         </div> : null}
         <div className="data-actions">
-          <button onClick={() => void api.exportLocalData().catch((reason) => onError(messageOf(reason)))}>Export history & files</button>
-          <button className="danger-button" onClick={() => void api.deleteLocalData().then(onClose).catch((reason) => onError(messageOf(reason)))}>Delete local data</button>
+          <button onClick={() => void api.exportLocalData().catch(reportError)}>Export history & files</button>
+          <button className="danger-button" onClick={() => void api.deleteLocalData().then(onClose).catch(reportError)}>Delete local data</button>
         </div>
         </section>
         <section className="data-controls" aria-labelledby="feedback-title">
@@ -176,8 +183,8 @@ export function Connections({ api, snapshot, onClose, onError }: {
           <textarea value={feedbackSummary} maxLength={4_000} placeholder="Describe the bug or idea. Do not include secrets." onChange={(event) => setFeedbackSummary(event.target.value)} />
           <label><input type="checkbox" checked={includeDiagnostics} onChange={(event) => setIncludeDiagnostics(event.target.checked)} /> Include a redacted diagnostic excerpt</label>
           <div className="data-actions">
-            <button disabled={feedbackSummary.trim().length < 10} onClick={() => void api.previewFeedback({ category: 'other', summary: feedbackSummary, includeDiagnostics }).then(setFeedbackPreview).catch((reason) => onError(messageOf(reason)))}>Preview package</button>
-            <button disabled={!feedbackPreview} onClick={() => void api.exportFeedback({ category: 'other', summary: feedbackSummary, includeDiagnostics }).catch((reason) => onError(messageOf(reason)))}>Export reviewed package</button>
+            <button disabled={feedbackSummary.trim().length < 10} onClick={() => void api.previewFeedback({ category: 'other', summary: feedbackSummary, includeDiagnostics }).then(setFeedbackPreview).catch(reportError)}>Preview package</button>
+            <button disabled={!feedbackPreview} onClick={() => void api.exportFeedback({ category: 'other', summary: feedbackSummary, includeDiagnostics }).catch(reportError)}>Export reviewed package</button>
           </div>
           {feedbackPreview ? <pre className="feedback-preview">{feedbackPreview}</pre> : null}
           <small>Conversation text, prompts, responses, file names, and file contents are excluded by default.</small>
@@ -221,6 +228,16 @@ export function CallPanel({ api, models, onClose, onError }: {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const [callError, setCallError] = useState('')
+  const reportError = (reason: unknown): void => {
+    const message = messageOf(reason)
+    setCallError(message)
+    onError(message)
+  }
+  const requestClose = (): void => {
+    if (connected) void stop().then(onClose).catch(reportError)
+    else onClose()
+  }
   const dialogRef = useDialogFocus(onClose)
 
   useEffect(() => {
@@ -275,7 +292,7 @@ export function CallPanel({ api, models, onClose, onError }: {
     } catch (reason) {
       peerRef.current?.close()
       streamRef.current?.getTracks().forEach((track) => track.stop())
-      onError(messageOf(reason))
+      reportError(reason)
     } finally {
       setConnecting(false)
     }
@@ -299,23 +316,21 @@ export function CallPanel({ api, models, onClose, onError }: {
     setConnected(false)
   }
 
-  return <div className="modal-backdrop" onMouseDown={onClose}>
+  return <div className="modal-backdrop" onMouseDown={requestClose}>
     <div ref={dialogRef} className="modal call-panel" role="dialog" aria-modal="true" aria-labelledby="call-title" onMouseDown={(event) => event.stopPropagation()}>
       <audio ref={remoteAudioRef} autoPlay />
-      <button className="icon-button call-close" onClick={() => {
-        if (connected) void stop()
-        onClose()
-      }} aria-label="Close voice session"><X size={18} /></button>
+      <button className="icon-button call-close" onClick={requestClose} aria-label="Close voice session"><X size={18} /></button>
       <div className="call-orbit"><NexusMark /><i /><i /></div>
       <p className="eyebrow">{connected ? 'Live voice workspace' : 'Explicit realtime session'}</p>
       <h2 id="call-title">{connected ? formatDuration(elapsed) : 'Talk through the brief'}</h2>
       <p>{connected ? 'Audio is using a short-lived provider connection.' : 'Starting requests microphone access and creates a provider session. Recording remains off unless selected.'}</p>
+      {callError ? <div className="modal-error" role="alert">{callError}<button onClick={() => setCallError('')} aria-label="Dismiss voice error"><X size={13} /></button></div> : null}
       {!connected ? <div className="call-options">
         <select aria-label="Realtime model" value={model} onChange={(event) => setModel(event.target.value)}><option value="">Choose a realtime model</option>{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
         <label><input type="checkbox" checked={saveTranscript} onChange={(event) => setSaveTranscript(event.target.checked)} /> Save a local recording for transcription</label>
       </div> : null}
       <div className={connected ? 'wave active' : 'wave'}>{Array.from({ length: 24 }, (_, index) => <i key={index} style={{ animationDelay: `${index * 40}ms` }} />)}</div>
-      <div className="call-actions"><button className={connected ? 'record-button active' : 'record-button'} disabled={connecting || (!connected && !model)} onClick={() => void (connected ? stop() : start())}>{connected ? <CircleStop size={22} /> : <Mic size={22} />}</button><span>{connecting ? 'Connecting…' : connected ? 'End session' : 'Start voice session'}</span></div>
+      <div className="call-actions"><button className={connected ? 'record-button active' : 'record-button'} disabled={connecting || (!connected && !model)} onClick={() => void (connected ? stop() : start()).catch(reportError)}>{connected ? <CircleStop size={22} /> : <Mic size={22} />}</button><span>{connecting ? 'Connecting…' : connected ? 'End session' : 'Start voice session'}</span></div>
     </div>
   </div>
 }
