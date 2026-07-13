@@ -4,7 +4,7 @@ import { configureWorkflow, WORKFLOWS } from '../../src/renderer/src/workflows'
 describe('guided workflows', () => {
   it('covers every supported work shape', () => {
     expect(WORKFLOWS.map((workflow) => workflow.id)).toEqual([
-      'decision', 'research', 'document', 'image', 'meeting', 'connector', 'terminal', 'custom'
+      'decision', 'research', 'document', 'image', 'connector', 'terminal', 'custom'
     ])
   })
 
@@ -17,7 +17,7 @@ describe('guided workflows', () => {
   })
 
   it('keeps external and system workflows explicit', () => {
-    const risky = WORKFLOWS.filter((workflow) => ['research', 'image', 'connector', 'terminal', 'meeting'].includes(workflow.id))
+    const risky = WORKFLOWS.filter((workflow) => ['research', 'image', 'connector', 'terminal'].includes(workflow.id))
     expect(risky.every((workflow) => /explicit|separate|approval|only after|never executed/i.test(workflow.safety))).toBe(true)
   })
 })

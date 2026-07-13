@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Activity, Bot, FlaskConical, Image, Link2, Search, Settings2, Sparkles,
+  Activity, FlaskConical, Image, Link2, Search, Settings2, Sparkles,
   SquareTerminal, Users, X
 } from 'lucide-react'
 import type {
@@ -13,7 +13,7 @@ import type {
 import type { ModelBadgeStyle } from '../preferences'
 import type { WorkflowDraft } from '../workflows'
 
-export function ContextInspector({ api, platform, models, primary, secondary, mode, workflow, jobs, imageModels, skills, badgeStyle, onModel, onError, onClose }: {
+export function ContextInspector({ api, platform, models, primary, secondary, mode, workflow, jobs, imageModels, badgeStyle, onModel, onError, onClose }: {
   api: NexusApi
   platform: PlatformCapabilities
   models: Model[]
@@ -23,7 +23,6 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
   workflow: WorkflowDraft | null
   jobs: AppSnapshot['jobs']
   imageModels: Model[]
-  skills: AppSnapshot['skills']
   badgeStyle: ModelBadgeStyle
   onModel: (id: string, primary: boolean) => void
   onError: (value: string) => void
@@ -35,7 +34,6 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
   const [terminalOutput, setTerminalOutput] = useState('')
   const [connectorUrl, setConnectorUrl] = useState('')
   const [connectorTools, setConnectorTools] = useState<string[]>([])
-  const [skillDescription, setSkillDescription] = useState('')
   const openai = models.filter((model) => model.provider === 'openai')
   const anthropic = models.filter((model) => model.provider === 'anthropic')
   const primaryProvider = models.find((model) => model.id === primary)?.provider
@@ -43,6 +41,7 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
   const secondaryModels = crossProviderModels.length
     ? crossProviderModels
     : primaryProvider === 'openai' ? anthropic : openai.length ? openai : models.filter((model) => model.id !== primary)
+  const advancedWorkflow = ['research', 'image', 'terminal', 'connector'].includes(workflow?.id ?? '')
 
   return <aside className="inspector" aria-label="Context inspector">
     <div className="inspector-head">
@@ -71,8 +70,9 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
         : <p className="muted">Choose a workflow to pin its context here.</p>}
     </section>
 
-    <section className="tool-dock">
-      <div className="section-title"><Activity size={15} /><span>Tool dock</span><b>explicit</b></div>
+    <details className="advanced-tool-dock" open={advancedWorkflow}>
+      <summary className="advanced-tool-summary"><Activity size={15} /><span><strong>Advanced tools</strong><small>Research, image, terminal, and connectors</small></span></summary>
+      <section className="tool-dock">
       <details open={workflow?.id === 'research'}>
         <summary><Search size={14} /> Research</summary>
         <input value={researchQuery} onChange={(event) => setResearchQuery(event.target.value)} placeholder="Question to investigate" />
@@ -123,17 +123,8 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
         {connectorTools.length ? <p className="tool-list">{connectorTools.join(' · ')}</p> : null}
       </details>
 
-      <details>
-        <summary><Bot size={14} /> Reusable skill</summary>
-        <input value={skillDescription} onChange={(event) => setSkillDescription(event.target.value)} placeholder="Create a skill that…" />
-        <button className="wide-button" disabled={!skillDescription.trim() || !primary} onClick={() => {
-          void api.generateSkill(skillDescription, primary)
-            .then(() => setSkillDescription(''))
-            .catch((reason) => onError(messageOf(reason)))
-        }}>Draft skill for review</button>
-        {skills.map((skill) => <div className="skill-row" key={skill.id}><span>{skill.name}</span><small>{skill.enabled ? 'enabled' : 'review needed'}</small></div>)}
-      </details>
-    </section>
+      </section>
+    </details>
 
     <section className="job-section">
       <div className="section-title"><Settings2 size={15} /><span>Background work</span><b>{jobs.filter((job) => job.status === 'running').length} live</b></div>

@@ -42,7 +42,7 @@ import {
   updatePrivacySettings
 } from './privacy'
 import { createRealtimeSession, discoverProviderModels } from './providers'
-import { configuredProviders, removeProviderKey, setProviderKey } from './secrets'
+import { configuredProviders, providerCredentials, removeProviderKey, setProviderKey } from './secrets'
 import { generateSkill, listSkills } from './skills'
 
 let mainWindow: BrowserWindow | null = null
@@ -111,6 +111,7 @@ function registerIpc(): void {
       return discovered
     } catch (error) {
       if (error instanceof ProviderConnectionError && error.code === 'authentication') {
+        await removeProviderKey(provider)
         configuredProviderIds.delete(provider)
         replaceProviderModels(provider, [])
         await broadcastSnapshot()
@@ -249,12 +250,16 @@ async function refreshConfiguredProviderIds(): Promise<void> {
 }
 
 async function restoreProviderModels(): Promise<void> {
-  await refreshConfiguredProviderIds()
-  for (const provider of await configuredProviders()) {
+  const credentials = await providerCredentials()
+  configuredProviderIds.clear()
+  const providers = Object.keys(credentials) as ProviderId[]
+  providers.forEach((provider) => configuredProviderIds.add(provider))
+  for (const provider of providers) {
     try {
-      replaceProviderModels(provider, await discoverProviderModels(provider))
+      replaceProviderModels(provider, await discoverProviderModels(provider, credentials[provider]))
     } catch (error) {
       if (error instanceof ProviderConnectionError && error.code === 'authentication') {
+        await removeProviderKey(provider)
         configuredProviderIds.delete(provider)
         replaceProviderModels(provider, [])
         await diagnostic('provider-key-rejected', { provider })
@@ -299,14 +304,6 @@ app.whenReady().then(async () => {
   openDatabase()
   await applyHistoryRetention()
   registerIpc()
-  if (restoreConfiguredProviders) {
-    void configuredProviders().then((providers) => {
-      providers.forEach((provider) => configuredProviderIds.add(provider))
-      return broadcastSnapshot()
-    }).catch((error) => diagnostic('provider-key-discovery-failed', {
-      message: error instanceof Error ? error.message : String(error)
-    }))
-  }
   configureJobNotifications(() => void broadcastSnapshot())
   configureSessionSecurity()
   await createWindow()

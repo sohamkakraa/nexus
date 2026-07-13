@@ -3,6 +3,7 @@ import type { ProviderId } from '../shared/contracts'
 import { platformCapabilities } from './platform'
 
 const SERVICE = 'com.nexus.desktop'
+const credentialCache: Partial<Record<ProviderId, string>> = {}
 
 export async function setProviderKey<T>(
   provider: ProviderId,
@@ -21,6 +22,7 @@ export async function setProviderKey<T>(
   }
   try {
     await keytar.setPassword(SERVICE, provider, normalized)
+    credentialCache[provider] = normalized
   } catch (error) {
     throw credentialStoreError(error)
   }
@@ -28,8 +30,11 @@ export async function setProviderKey<T>(
 }
 
 export async function getProviderKey(provider: ProviderId): Promise<string | null> {
+  if (credentialCache[provider]) return credentialCache[provider] ?? null
   try {
-    return await keytar.getPassword(SERVICE, provider)
+    const key = await keytar.getPassword(SERVICE, provider)
+    if (key) credentialCache[provider] = key
+    return key
   } catch (error) {
     throw credentialStoreError(error)
   }
@@ -37,19 +42,31 @@ export async function getProviderKey(provider: ProviderId): Promise<string | nul
 
 export async function removeProviderKey(provider: ProviderId): Promise<boolean> {
   try {
-    return await keytar.deletePassword(SERVICE, provider)
+    const removed = await keytar.deletePassword(SERVICE, provider)
+    delete credentialCache[provider]
+    return removed
   } catch (error) {
     throw credentialStoreError(error)
   }
 }
 
 export async function configuredProviders(): Promise<ProviderId[]> {
-  const providers: ProviderId[] = ['openai', 'anthropic']
-  const results = await Promise.all(providers.map(async (provider) => [
-    provider,
-    await getProviderKey(provider).catch(() => null)
-  ] as const))
-  return results.filter(([, key]) => Boolean(key)).map(([provider]) => provider)
+  return Object.keys(await providerCredentials()) as ProviderId[]
+}
+
+export async function providerCredentials(): Promise<Partial<Record<ProviderId, string>>> {
+  try {
+    const credentials = await keytar.findCredentials(SERVICE)
+    return credentials.reduce<Partial<Record<ProviderId, string>>>((result, credential) => {
+      if ((credential.account === 'openai' || credential.account === 'anthropic') && credential.password) {
+        result[credential.account] = credential.password
+        credentialCache[credential.account] = credential.password
+      }
+      return result
+    }, {})
+  } catch (error) {
+    throw credentialStoreError(error)
+  }
 }
 
 function credentialStoreError(cause: unknown): Error {

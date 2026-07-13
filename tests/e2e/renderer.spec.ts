@@ -87,15 +87,16 @@ test('researcher configures and edits a guided workflow safely', async () => {
   }
 })
 
-test('power user choices persist and explain adaptation', async () => {
+test('power user choices persist and remain explainable', async () => {
   const harness = await launchHarness('developer')
   try {
-    await harness.page.getByRole('button', { name: 'Workspace choices' }).click()
+    await harness.page.keyboard.press('ControlOrMeta+K')
+    await harness.page.getByRole('button', { name: /Open workspace choices/ }).click()
     await harness.page.getByRole('button', { name: 'Compact' }).click()
     await harness.page.getByRole('radio', { name: 'Tidal' }).click()
     await harness.page.getByRole('button', { name: 'Context', exact: true }).click()
     await harness.page.getByRole('button', { name: 'Reduced' }).click()
-    await harness.page.getByRole('button', { name: 'Why this changed' }).click()
+    await harness.page.getByRole('button', { name: 'Explain my choices' }).click()
     await expect(harness.page.getByText(/because you selected it/)).toBeVisible()
     await expect(harness.page.getByTestId('app')).toHaveAttribute('data-density', 'compact')
     await expect(harness.page.getByTestId('app')).toHaveAttribute('data-accent', 'tidal')
@@ -111,7 +112,8 @@ test('power user choices persist and explain adaptation', async () => {
 test('diagnostics are explicit and mocked without network', async () => {
   const harness = await launchHarness('developer')
   try {
-    await harness.page.getByRole('button', { name: 'Self-test' }).click()
+    await harness.page.keyboard.press('ControlOrMeta+K')
+    await harness.page.getByRole('button', { name: /Open self-test/ }).click()
     await expect(harness.page.getByRole('heading', { name: 'Workspace diagnostics' })).toBeVisible()
     await harness.page.getByRole('button', { name: 'Inspect mapping' }).click()
     await expect(harness.page.getByText(/2 models have explicit capability maps/)).toBeVisible()
@@ -167,7 +169,7 @@ test('local database errors provide a recovery action', async () => {
 test('landmarks and keyboard focus remain accessible', async () => {
   const harness = await launchHarness('accessibility')
   try {
-    await expect(harness.page.getByRole('navigation', { name: 'Workspace views' })).toBeVisible()
+    await expect(harness.page.getByRole('navigation', { name: 'Local work history' })).toBeVisible()
     await expect(harness.page.getByRole('main', { name: 'Council workspace' })).toBeVisible()
     await expect(harness.page.getByRole('complementary', { name: 'Context inspector' })).toBeVisible()
     await harness.page.keyboard.press('Meta+k')

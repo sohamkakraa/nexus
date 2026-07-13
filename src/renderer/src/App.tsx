@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity, ArrowRight, Bot, ChevronDown, FilePlus2, KeyRound, LayoutGrid, Menu,
-  Mic, Moon, Paperclip, Plus, Send, Settings2, ShieldCheck, Sparkles, Sun, Users,
-  Wrench, X
+  Activity, ArrowRight, Bot, ChevronDown, FilePlus2, KeyRound, Menu,
+  Mic, Moon, Paperclip, Plus, Send, ShieldCheck, Sparkles, Sun, Users, X
 } from 'lucide-react'
 import type { AppSnapshot, Attachment, Conversation, NexusApi } from '../../shared/contracts'
 import { ContextInspector } from './components/ContextInspector'
@@ -228,18 +227,23 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     setMainView('work')
   }
 
+  const commandActions: Array<[string, () => void]> = [
+    ['Open workflow library', () => setLibraryOpen(true)],
+    ['New Council work item', () => void createConversation('council')],
+    ['New solo work item', () => void createConversation('solo')],
+    ['Attach local files', () => void addFiles()],
+    ['Open connections', () => setSettingsOpen(true)],
+    ['Open workspace choices', () => setMainView('preferences')],
+    ['Open self-test', () => setMainView('diagnostics')]
+  ]
+  if (realtimeModels.length) commandActions.push(['Start voice session', () => setCallOpen(true)])
+
   return <div className={`app theme-${theme} platform-${currentSnapshot.platform.os}${inspectorOpen && mainView === 'work' ? ' inspector-visible' : ''}`} data-testid="app" data-density={preferences.density} data-accent={preferences.accent} data-emphasis={preferences.emphasis} data-motion={preferences.motion} data-inspector={inspectorOpen && mainView === 'work' ? 'open' : 'closed'}>
     <a className="skip-link" href="#main-content">Skip to workspace</a>
     <aside className="sidebar" aria-label="Nexus navigation">
       <div className="traffic-space" />
       <div className="brand"><NexusMark /><span><strong>Nexus</strong><small>Council workspace</small></span><button className="icon-button sidebar-menu" aria-label="Open commands" onClick={() => setPaletteOpen(true)}><Menu size={17} /></button></div>
       <button className="new-work" onClick={() => setLibraryOpen(true)}><Plus size={16} /><span>New work item</span><kbd>⌘N</kbd></button>
-      <nav className="primary-nav" aria-label="Workspace views">
-        <button className={mainView === 'work' ? 'active' : ''} onClick={() => setMainView('work')}><LayoutGrid size={16} /> Council table</button>
-        <button className={mainView === 'preferences' ? 'active' : ''} onClick={() => setMainView('preferences')}><Settings2 size={16} /> Workspace choices</button>
-        <button className={mainView === 'diagnostics' ? 'active' : ''} onClick={() => setMainView('diagnostics')}><Wrench size={16} /> Self-test</button>
-      </nav>
-      {preferences.suggestedWorkflows ? <div className="sidebar-workflows"><div className="sidebar-label">Working methods</div>{WORKFLOWS.slice(0, 4).map((item) => <button key={item.id} onClick={() => chooseWorkflow(item)}><span>{item.shortLabel}</span><ArrowRight size={13} /></button>)}<button onClick={() => setLibraryOpen(true)}><span>All workflows</span><span>8</span></button></div> : null}
       <div className="sidebar-label history-label">Local work</div>
       <nav className="work-list" aria-label="Local work history">
         {currentSnapshot.conversations.map((conversation) => <button key={conversation.id} className={conversation.id === activeId && mainView === 'work' ? 'work-item active' : 'work-item'} onClick={() => openWork(conversation)}><span className="work-mode">{conversation.mode === 'council' ? <Users size={13} /> : <Bot size={13} />}</span><span>{conversation.title}</span><time>{relativeTime(conversation.updatedAt)}</time></button>)}
@@ -258,7 +262,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     <main className="workspace" id="main-content" aria-label="Council workspace">
       <header className="topbar">
         <div><p className="eyebrow">{mainView === 'work' ? (workflow?.title ?? 'Open table') : mainView === 'preferences' ? 'Workspace choices' : 'Local diagnostics'}</p><h1>{mainView === 'work' ? (active?.title ?? 'Untitled work item') : mainView === 'preferences' ? 'Make Nexus fit your work' : 'Check before you rely on it'}</h1></div>
-        <div className="top-actions">{!online ? <span className="offline-chip"><i /> Offline</span> : null}{mainView === 'work' ? <><button className="quiet-button" onClick={() => setCallOpen(true)}><Mic size={16} /> Voice</button><button className="quiet-button" onClick={() => setLibraryOpen(true)}><Sparkles size={16} /> Workflow</button><button className="icon-button" aria-label={inspectorOpen ? 'Hide context inspector' : 'Show context inspector'} onClick={() => setInspectorOpen((value) => !value)}><Activity size={18} /></button></> : null}</div>
+        <div className="top-actions">{!online ? <span className="offline-chip"><i /> Offline</span> : null}{mainView === 'work' ? <>{realtimeModels.length ? <button className="quiet-button" onClick={() => setCallOpen(true)}><Mic size={16} /> Voice</button> : null}<button className="quiet-button" onClick={() => setLibraryOpen(true)}><Sparkles size={16} /> Workflow</button><button className="icon-button" aria-label={inspectorOpen ? 'Hide context inspector' : 'Show context inspector'} onClick={() => setInspectorOpen((value) => !value)}><Activity size={18} /></button></> : null}</div>
       </header>
       {!online ? <div className="offline-banner" role="status"><strong>You are offline.</strong> Local history and workspace choices still work. Provider and connector actions will wait for a connection.</div> : null}
       {mainView === 'preferences' ? <div className="surface-scroll"><PreferenceStudio preferences={preferences} onChange={updatePreferences} onReset={() => {
@@ -304,7 +308,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       </> : null}
     </main>
 
-    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} platform={currentSnapshot.platform} models={textModels} primary={primaryModel} secondary={secondaryModel} mode={mode} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} skills={currentSnapshot.skills} badgeStyle={preferences.modelBadges} onModel={chooseModel} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
+    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} platform={currentSnapshot.platform} models={textModels} primary={primaryModel} secondary={secondaryModel} mode={mode} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} badgeStyle={preferences.modelBadges} onModel={chooseModel} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
     {settingsOpen ? <Connections api={nexusApi} snapshot={currentSnapshot} onClose={() => setSettingsOpen(false)} onError={setError} /> : null}
     {libraryOpen ? <div className="modal-backdrop" onMouseDown={() => setLibraryOpen(false)}><div className="modal workflow-modal" role="dialog" aria-modal="true" aria-label="Workflow library" onMouseDown={(event) => event.stopPropagation()}><WorkflowLibrary onChoose={chooseWorkflow} onClose={() => setLibraryOpen(false)} /></div></div> : null}
     {editorOpen && workflow ? <WorkflowEditor workflow={workflow} onClose={() => setEditorOpen(false)} onSave={(next) => {
@@ -313,16 +317,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       setDraft(next.instruction)
       setEditorOpen(false)
     }} /> : null}
-    {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} actions={[
-      ['Open workflow library', () => setLibraryOpen(true)],
-      ['New Council work item', () => void createConversation('council')],
-      ['New solo work item', () => void createConversation('solo')],
-      ['Attach local files', () => void addFiles()],
-      ['Open connections', () => setSettingsOpen(true)],
-      ['Open workspace choices', () => setMainView('preferences')],
-      ['Open self-test', () => setMainView('diagnostics')],
-      ['Start voice session', () => setCallOpen(true)]
-    ]} /> : null}
+    {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} actions={commandActions} /> : null}
     {callOpen ? <CallPanel api={nexusApi} models={realtimeModels} onClose={() => setCallOpen(false)} onError={setError} /> : null}
   </div>
 }
@@ -336,7 +331,7 @@ function Welcome({ configuredProviders, showSuggestions, onWorkflow, onBrowse, o
 }): React.JSX.Element {
   return <section className="welcome" aria-labelledby="welcome-title">
     <div className="council-table" aria-label="Two model perspectives converge into one synthesis"><div className="model-position first"><i />Lead perspective</div><div className="model-position second"><i />Challenge perspective</div><div className="convergence" aria-hidden="true"><i /><i /><b /></div><div className="synthesis-position"><NexusMark compact />Synthesis</div></div>
-    <p className="eyebrow">A table for difficult work</p><h2 id="welcome-title">Set the table.</h2><p>Give two models a shared brief. One develops the case, one tests it, and Nexus keeps the final reasoning visible.</p>
+    <p className="eyebrow">A table for difficult work</p><h2 id="welcome-title">Set the table.</h2><p>Give two models a shared brief. One develops the case, one tests it, and Nexus returns one clear synthesis.</p>
     <div className="welcome-actions"><button className="primary-action" onClick={onBrowse}>Choose a workflow <ArrowRight size={16} /></button>{configuredProviders < 1 ? <button className="secondary-action" onClick={onConnect}>Connect models</button> : null}</div>
     {showSuggestions ? <div className="suggestion-row" aria-label="Suggested workflows">{WORKFLOWS.slice(0, 3).map((item) => <button key={item.id} onClick={() => onWorkflow(item)}><span>{item.shortLabel}</span><small>{item.description}</small></button>)}</div> : null}
   </section>

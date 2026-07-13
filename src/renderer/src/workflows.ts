@@ -3,7 +3,6 @@ export type WorkflowId =
   | 'research'
   | 'document'
   | 'image'
-  | 'meeting'
   | 'connector'
   | 'terminal'
   | 'custom'
@@ -46,7 +45,7 @@ export const WORKFLOWS: readonly WorkflowDefinition[] = [
     mode: 'council',
     instruction: 'Research question:\n\nAudience and decision this supports:\n\nScope and exclusions:\n\nEvidence standard:',
     context: ['Question', 'Scope', 'Sources', 'Uncertainty'],
-    safety: 'Research tools run only after you choose a depth and budget.'
+    safety: 'Research tools run only after you explicitly choose a search depth.'
   },
   {
     id: 'document',
@@ -67,16 +66,6 @@ export const WORKFLOWS: readonly WorkflowDefinition[] = [
     instruction: 'Image objective:\n\nSubject and setting:\n\nComposition, material, and light:\n\nAvoid:',
     context: ['Art direction', 'Composition', 'Constraints', 'Generation prompt'],
     safety: 'Image generation is a separate explicit action in the tool dock.'
-  },
-  {
-    id: 'meeting',
-    title: 'Meeting / call transcript',
-    shortLabel: 'Meeting',
-    description: 'Turn a recording or transcript into decisions, owners, and open questions.',
-    mode: 'council',
-    instruction: 'Meeting purpose:\n\nParticipants or roles:\n\nWhat to extract:\n- Decisions\n- Owners and dates\n- Open questions\n\nAdditional context:',
-    context: ['Recording', 'Decisions', 'Owners', 'Follow-ups'],
-    safety: 'Microphone access and transcript saving remain separate, explicit choices.'
   },
   {
     id: 'connector',

@@ -138,7 +138,9 @@ export function Connections({ api, snapshot, onClose, onError }: {
         </div>
       })}
       <div className="privacy-note"><ShieldCheck size={17} /><div><strong>What stays local</strong><p>Work, imported files, preferences, and permission decisions remain on this device. Only requests you run go to the connection you choose.</p></div></div>
-      <section className="data-controls" aria-labelledby="local-data-title">
+      <details className="connection-advanced">
+        <summary>Local data, personalization, and feedback</summary>
+        <section className="data-controls" aria-labelledby="local-data-title">
         <div>
           <p className="eyebrow">Local controls</p>
           <h3 id="local-data-title">Your data, on your terms</h3>
@@ -164,8 +166,8 @@ export function Connections({ api, snapshot, onClose, onError }: {
           <button onClick={() => void api.exportLocalData().catch((reason) => onError(messageOf(reason)))}>Export history & files</button>
           <button className="danger-button" onClick={() => void api.deleteLocalData().then(onClose).catch((reason) => onError(messageOf(reason)))}>Delete local data</button>
         </div>
-      </section>
-      <section className="data-controls" aria-labelledby="feedback-title">
+        </section>
+        <section className="data-controls" aria-labelledby="feedback-title">
         <label className="setting-row checkbox-row">
           <span><strong id="feedback-title">Opt-in feedback packages</strong><small>Nexus creates a file for review and never uploads it automatically.</small></span>
           <input type="checkbox" checked={privacy.feedbackEnabled} onChange={(event) => void savePrivacy({ feedbackEnabled: event.target.checked })} />
@@ -180,7 +182,8 @@ export function Connections({ api, snapshot, onClose, onError }: {
           {feedbackPreview ? <pre className="feedback-preview">{feedbackPreview}</pre> : null}
           <small>Conversation text, prompts, responses, file names, and file contents are excluded by default.</small>
         </div> : null}
-      </section>
+        </section>
+      </details>
     </div>
   </div>
 }
