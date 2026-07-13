@@ -92,12 +92,15 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
 
   useEffect(() => {
     if (!activeId && currentSnapshot.conversations[0]) setActiveId(currentSnapshot.conversations[0].id)
-    if (!primaryModel && textModels[0]) setPrimaryModel(textModels[0].id)
-    if (!secondaryModel || secondaryModel === primaryModel) {
-      const primaryProvider = textModels.find((model) => model.id === primaryModel)?.provider
-      const other = textModels.find((model) => model.id !== primaryModel && model.provider !== primaryProvider)
-        ?? textModels.find((model) => model.id !== primaryModel)
-      if (other) setSecondaryModel(other.id)
+    const selectedPrimary = textModels.find((model) => model.id === primaryModel)
+    if (!selectedPrimary) {
+      setPrimaryModel(textModels[0]?.id ?? '')
+      return
+    }
+    const selectedSecondary = textModels.find((model) => model.id === secondaryModel)
+    if (!selectedSecondary || selectedSecondary.provider === selectedPrimary.provider) {
+      const other = textModels.find((model) => model.provider !== selectedPrimary.provider)
+      setSecondaryModel(other?.id ?? '')
     }
   }, [activeId, currentSnapshot.conversations, primaryModel, secondaryModel, textModels])
 
@@ -140,8 +143,10 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  function chooseWorkflow(definition: WorkflowDefinition): void {
+  async function chooseWorkflow(definition: WorkflowDefinition): Promise<void> {
     const next = configureWorkflow(definition.id)
+    const conversation = await createConversation(next.mode)
+    if (!conversation) return
     setWorkflow(next)
     setMode(next.mode)
     setDraft(next.instruction)
@@ -161,6 +166,8 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       setActiveId(conversation.id)
       setMode(nextMode)
       setDraft('')
+      setAttachments([])
+      setWorkflow(null)
       setMainView('work')
       return conversation
     } catch (reason) {
@@ -171,6 +178,10 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
 
   async function send(): Promise<void> {
     if (!draft.trim() || !primaryModel || sending) return
+    if (mode === 'council' && !councilReady) {
+      setError('Council mode needs one connected OpenAI model and one connected Anthropic model.')
+      return
+    }
     setError('')
     setSending(true)
     setStreamed(null)
@@ -215,7 +226,9 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
   function chooseModel(id: string, primary: boolean): void {
     if (primary) {
       setPrimaryModel(id)
-      if (id === secondaryModel) setSecondaryModel(textModels.find((model) => model.id !== id)?.id ?? '')
+      const provider = textModels.find((model) => model.id === id)?.provider
+      const challenger = textModels.find((model) => model.provider !== provider)
+      setSecondaryModel(challenger?.id ?? '')
     } else {
       setSecondaryModel(id)
     }
@@ -224,8 +237,15 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
   function openWork(conversation: Conversation): void {
     setActiveId(conversation.id)
     setMode(conversation.mode)
+    setDraft('')
+    setAttachments([])
+    setWorkflow(null)
     setMainView('work')
   }
+
+  const primaryProvider = textModels.find((model) => model.id === primaryModel)?.provider
+  const secondaryProvider = textModels.find((model) => model.id === secondaryModel)?.provider
+  const councilReady = Boolean(primaryModel && secondaryModel && primaryModel !== secondaryModel && primaryProvider !== secondaryProvider)
 
   const commandActions: Array<[string, () => void]> = [
     ['Open workflow library', () => setLibraryOpen(true)],
@@ -301,7 +321,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
                 void send()
               }
             }} />
-            <div className="composer-tools"><button className="icon-button" onClick={() => void addFiles()} aria-label="Attach local files"><Paperclip size={18} /></button><button className="mode-switch" onClick={() => setMode(mode === 'solo' ? 'council' : 'solo')}>{mode === 'council' ? <Users size={15} /> : <Bot size={15} />}{mode === 'council' ? 'Council' : 'Solo'}<ChevronDown size={13} /></button><span className="composer-safety">{mode === 'council' ? 'Two models → one synthesis' : 'Direct lead model'}</span><div className="spacer" /><span className="file-count">{attachments.length}/10</span><button className="send-button" onClick={() => void send()} disabled={!draft.trim() || !primaryModel || sending}><span>{sending ? 'Working' : 'Send brief'}</span><Send size={16} /></button></div>
+            <div className="composer-tools"><button className="icon-button" onClick={() => void addFiles()} aria-label="Attach local files"><Paperclip size={18} /></button><button className="mode-switch" onClick={() => setMode(mode === 'solo' ? 'council' : 'solo')}>{mode === 'council' ? <Users size={15} /> : <Bot size={15} />}{mode === 'council' ? 'Council' : 'Solo'}<ChevronDown size={13} /></button><span className="composer-safety">{mode === 'council' ? (councilReady ? 'OpenAI + Anthropic → one synthesis' : 'Connect both providers for Council') : 'Direct lead model'}</span><div className="spacer" /><span className="file-count">{attachments.length}/10</span><button className="send-button" onClick={() => void send()} disabled={!draft.trim() || !primaryModel || sending || (mode === 'council' && !councilReady)}><span>{sending ? 'Working' : 'Send brief'}</span><Send size={16} /></button></div>
           </div>
           <p className="composer-note">⌘ Enter sends · consequential actions still ask for approval</p>
         </section>

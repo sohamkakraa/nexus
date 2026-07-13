@@ -761,6 +761,8 @@ button, select, input, textarea { color: inherit; }
 .modal-head p, .modal-head h2 { margin: 0; }
 .modal-head h2 { margin-top: 5px; font: 460 27px/1.1 Charter, "Iowan Old Style", Georgia, serif; letter-spacing: -.035em; }
 .modal-intro { max-width: 540px; margin: 0; padding: 0 23px 18px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.modal-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 22px 12px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: 7px; color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); font-size: 8px; line-height: 1.45; }
+.modal-error button { display: inline-flex; padding: 2px; border: 0; color: inherit; background: transparent; }
 .provider-list { padding: 0 15px; }
 .provider-card {
   display: grid;

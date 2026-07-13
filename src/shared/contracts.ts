@@ -49,6 +49,14 @@ export const ChatRequestSchema = z.object({
   primaryModel: z.string(),
   secondaryModel: z.string().optional(),
   attachmentIds: z.array(z.string()).max(10).default([])
+}).superRefine((request, context) => {
+  if (request.mode === 'council' && (!request.secondaryModel || request.secondaryModel === request.primaryModel)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['secondaryModel'],
+      message: 'Council mode requires two distinct text models.'
+    })
+  }
 })
 export type ChatRequest = z.infer<typeof ChatRequestSchema>
 

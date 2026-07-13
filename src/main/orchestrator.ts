@@ -22,9 +22,6 @@ export async function runChat(
     id: nanoid(), conversationId: request.conversationId, role: 'user',
     content: request.content, createdAt: now, attachments
   }
-  insertMessage(userMessage)
-  if (conversation.messages.length === 0) renameConversation(conversation.id, titleFrom(request.content))
-
   const context = buildContext(conversation.messages, request.content, conversation.id)
   const system = await systemPrompt()
   const content = request.mode === 'council' && request.secondaryModel
@@ -38,6 +35,8 @@ export async function runChat(
     content: normalizeClarification(content), author: request.mode === 'council' ? 'Nexus Council' : request.primaryModel,
     createdAt: new Date().toISOString(), attachments: []
   }
+  insertMessage(userMessage)
+  if (conversation.messages.length === 0) renameConversation(conversation.id, titleFrom(request.content))
   insertMessage(assistantMessage)
   refreshRollingMemory(request.conversationId)
   return assistantMessage

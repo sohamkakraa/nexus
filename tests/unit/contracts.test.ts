@@ -26,6 +26,24 @@ describe('IPC contracts', () => {
       conversationId: 'c', query: 'valid query', depth: 'deep', budgetUsd: 101
     })).toThrow()
   })
+
+  it('requires two distinct models for Council requests', () => {
+    expect(() => ChatRequestSchema.parse({
+      conversationId: 'thread',
+      content: 'Compare these options',
+      mode: 'council',
+      primaryModel: 'gpt-current',
+      attachmentIds: []
+    })).toThrow(/two distinct text models/i)
+    expect(() => ChatRequestSchema.parse({
+      conversationId: 'thread',
+      content: 'Compare these options',
+      mode: 'council',
+      primaryModel: 'gpt-current',
+      secondaryModel: 'gpt-current',
+      attachmentIds: []
+    })).toThrow(/two distinct text models/i)
+  })
 })
 
 describe('command safety', () => {

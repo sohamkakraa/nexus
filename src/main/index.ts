@@ -129,15 +129,33 @@ function registerIpc(): void {
   })
   handleTrusted('chat:send', async (event, rawRequest: unknown) => {
     const request = ChatRequestSchema.parse(rawRequest)
-    const message = await runChat(request, getAttachments(request.attachmentIds), undefined, (delta) => {
-      event.sender.send('chat:delta', { conversationId: request.conversationId, delta })
-    })
-    await broadcastSnapshot()
-    return message
+    const primary = requireModelCapability(request.primaryModel, 'text')
+    if (request.mode === 'council') {
+      const secondary = requireModelCapability(request.secondaryModel!, 'text')
+      if (primary.provider === secondary.provider) {
+        throw new Error('Council mode requires one OpenAI model and one Anthropic model.')
+      }
+    }
+    try {
+      const message = await runChat(request, getAttachments(request.attachmentIds), undefined, (delta) => {
+        event.sender.send('chat:delta', { conversationId: request.conversationId, delta })
+      })
+      await broadcastSnapshot()
+      return message
+    } catch (error) {
+      if (error instanceof ProviderConnectionError && error.code === 'authentication') {
+        await removeProviderKey(error.provider)
+        configuredProviderIds.delete(error.provider)
+        replaceProviderModels(error.provider, [])
+        await broadcastSnapshot()
+      }
+      throw error
+    }
   })
   handleTrusted('files:select', async () => selectAndImportFiles())
   handleTrusted('image:generate', async (_event, prompt: unknown, model: unknown) => {
     if (typeof prompt !== 'string' || typeof model !== 'string') throw new Error('Prompt and image model are required.')
+    requireModelCapability(model, 'image')
     return startImageJob(prompt.slice(0, 10_000), model)
   })
   handleTrusted('audio:transcribe', async () => {
@@ -146,6 +164,7 @@ function registerIpc(): void {
   })
   handleTrusted('realtime:create', (_event, model: unknown) => {
     if (typeof model !== 'string' || !model) throw new Error('Choose a realtime model first.')
+    requireModelCapability(model, 'realtime')
     return createRealtimeSession(model)
   })
   handleTrusted('recording:save', async (_event, rawData: unknown, mime: unknown) => {
@@ -206,6 +225,7 @@ function registerIpc(): void {
   })
   handleTrusted('skill:generate', async (_event, description: unknown, model: unknown) => {
     if (typeof description !== 'string' || typeof model !== 'string') throw new Error('Description and model are required.')
+    requireModelCapability(model, 'text')
     const skill = await generateSkill(description, model)
     await broadcastSnapshot()
     return skill
@@ -241,6 +261,14 @@ function capabilityModel(capability: 'research' | 'transcription'): string {
 function replaceProviderModels(provider: ProviderId, discovered: Model[]): void {
   for (const [id, model] of models) if (model.provider === provider) models.delete(id)
   discovered.forEach((model) => models.set(model.id, model))
+}
+
+function requireModelCapability(modelId: string, capability: Model['capabilities'][number]): Model {
+  const model = models.get(modelId)
+  if (!model || !model.capabilities.includes(capability)) {
+    throw new Error(`Choose an account-available ${capability} model in Connections.`)
+  }
+  return model
 }
 
 async function refreshConfiguredProviderIds(): Promise<void> {
