@@ -98,7 +98,7 @@
     }
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
+    "@anthropic-ai/sdk": "^0.111.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.11.1",
     "clsx": "^2.1.1",
@@ -128,7 +128,7 @@
     "electron": "43.1.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "eslint": "^10.6.0",
+    "eslint": "^10.7.0",
     "globals": "^17.7.0",
     "playwright": "^1.61.1",
     "typescript": "^6.0.3",
