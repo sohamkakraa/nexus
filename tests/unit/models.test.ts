@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { curateProviderModels } from '../../src/shared/models'
+import { curateProviderModels, defaultModelForCapability } from '../../src/shared/models'
 
 describe('provider model curation', () => {
   it('keeps a bounded, current subset of account-available OpenAI models', () => {
@@ -74,5 +74,41 @@ describe('provider model curation', () => {
     ])
     expect(curated.every((model) => available.includes(model.id))).toBe(true)
     expect(curated.every((model) => model.capabilities.includes('text'))).toBe(true)
+  })
+
+  it('discovers newer account models without a fixed availability whitelist', () => {
+    const available = [
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-realtime-2',
+      'gpt-live-1',
+      'gpt-image-2',
+      'gpt-realtime-whisper'
+    ]
+    const curated = curateProviderModels('openai', available)
+
+    expect(curated.map((model) => model.id)).toEqual(expect.arrayContaining(available))
+    expect(curated.every((model) => available.includes(model.id))).toBe(true)
+    expect(curated.find((model) => model.id === 'gpt-live-1')?.capabilities).toContain('realtime')
+    expect(curated.find((model) => model.id === 'gpt-5.6-sol')).toMatchObject({
+      contextWindow: 1_050_000,
+      reasoningModes: ['standard', 'pro']
+    })
+  })
+
+  it('selects the newest account-available default independently for each use case', () => {
+    const models = curateProviderModels('openai', [
+      'gpt-5.4',
+      'gpt-5.7',
+      'gpt-image-2',
+      'gpt-image-3',
+      'gpt-realtime-2',
+      'gpt-realtime-2.1',
+      'gpt-4o-transcribe'
+    ])
+
+    expect(defaultModelForCapability(models, 'text', 'openai')?.id).toBe('gpt-5.7')
+    expect(defaultModelForCapability(models, 'image', 'openai')?.id).toBe('gpt-image-3')
+    expect(defaultModelForCapability(models, 'realtime', 'openai')?.id).toBe('gpt-realtime-2.1')
   })
 })

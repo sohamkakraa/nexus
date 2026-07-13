@@ -7,21 +7,30 @@ import {
   type IpcMainInvokeEvent,
   type WebContents
 } from 'electron'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import {
   ChatRequestSchema, ProviderSchema, ResearchRequestSchema,
-  type AppSnapshot, type Conversation, type Model, type ProviderId
+  type AppSnapshot, type Conversation, type Model, type ProviderId, type ReasoningEffort
 } from '../shared/contracts'
 import { ProviderConnectionError } from '../shared/provider-errors'
+import { defaultModelForCapability } from '../shared/models'
 import {
   isSafeDevelopmentUrl,
   isTrustedRendererUrl,
   redactForPreview,
   redactSecrets
 } from '../shared/safety'
-import { getAttachments, insertConversation, listConversations, openDatabase } from './database'
+import {
+  deleteConversation as deleteConversationRecord,
+  getAttachments,
+  insertConversation,
+  listConversations,
+  openDatabase,
+  setConversationArchived,
+  setConversationPinned
+} from './database'
 import { diagnostic } from './diagnostics'
 import { selectAndImportFiles } from './files'
 import {
@@ -122,19 +131,44 @@ function registerIpc(): void {
   handleTrusted('conversation:create', async (_event, rawMode: unknown) => {
     const mode = rawMode === 'council' ? 'council' : 'solo'
     const now = new Date().toISOString()
-    const conversation: Conversation = { id: nanoid(), title: 'New conversation', mode, createdAt: now, updatedAt: now, messages: [] }
+    const conversation: Conversation = {
+      id: nanoid(), title: 'New conversation', mode, pinned: false, archived: false,
+      createdAt: now, updatedAt: now, messages: []
+    }
     insertConversation(conversation)
     void broadcastSnapshot().catch(() => diagnostic('snapshot-broadcast-failed', { source: 'conversation-create' }))
     return conversation
   })
+  handleTrusted('conversation:pin', async (_event, id: unknown, pinned: unknown) => {
+    setConversationPinned(conversationId(id), pinned === true)
+    await broadcastSnapshot()
+  })
+  handleTrusted('conversation:archive', async (_event, id: unknown, archived: unknown) => {
+    setConversationArchived(conversationId(id), archived === true)
+    await broadcastSnapshot()
+  })
+  handleTrusted('conversation:delete', async (_event, id: unknown) => {
+    const paths = deleteConversationRecord(conversationId(id))
+    await Promise.all(paths.map((path) => rm(path, { force: true }).catch(() => undefined)))
+    await broadcastSnapshot()
+  })
   handleTrusted('chat:send', async (event, rawRequest: unknown) => {
     const request = ChatRequestSchema.parse(rawRequest)
     const primary = requireModelCapability(request.primaryModel, 'text')
+    requireReasoningSupport(primary, request.primaryReasoningEffort)
     if (request.mode === 'council') {
       const secondary = requireModelCapability(request.secondaryModel!, 'text')
+      requireReasoningSupport(secondary, request.secondaryReasoningEffort)
       if (primary.provider === secondary.provider) {
         throw new Error('Council mode requires one OpenAI model and one Anthropic model.')
       }
+      if (
+        request.reasoningMode
+        && !primary.reasoningModes?.includes(request.reasoningMode)
+        && !secondary.reasoningModes?.includes(request.reasoningMode)
+      ) throw new Error('The selected models do not support that reasoning mode.')
+    } else if (request.reasoningMode && !primary.reasoningModes?.includes(request.reasoningMode)) {
+      throw new Error('The selected model does not support that reasoning mode.')
     }
     try {
       const message = await runChat(request, getAttachments(request.attachmentIds), undefined, (delta) => {
@@ -162,10 +196,13 @@ function registerIpc(): void {
     const [attachment] = (await selectAndImportFiles()).filter((file) => file.kind === 'audio')
     return attachment ? startTranscriptionJob(attachment.path, transcriptionModel()) : null
   })
-  handleTrusted('realtime:create', (_event, model: unknown) => {
+  handleTrusted('realtime:create', (_event, model: unknown, reasoningEffort: unknown) => {
     if (typeof model !== 'string' || !model) throw new Error('Choose a realtime model first.')
-    requireModelCapability(model, 'realtime')
-    return createRealtimeSession(model)
+    const selected = requireModelCapability(model, 'realtime')
+    const effort = typeof reasoningEffort === 'string' && selected.reasoningEfforts?.includes(reasoningEffort as never)
+      ? reasoningEffort as ReasoningEffort
+      : undefined
+    return createRealtimeSession(model, effort)
   })
   handleTrusted('recording:save', async (_event, rawData: unknown, mime: unknown) => {
     if (!(rawData instanceof Uint8Array) || rawData.byteLength > 200 * 1024 * 1024) throw new Error('Recording data is invalid or too large.')
@@ -249,9 +286,7 @@ function transcriptionModel(): string {
 }
 
 function capabilityModel(capability: 'research' | 'transcription'): string {
-  const available = [...models.values()].find(
-    (model) => model.provider === 'openai' && model.capabilities.includes(capability)
-  )
+  const available = defaultModelForCapability([...models.values()], capability, 'openai')
   if (!available) {
     throw new Error(`OpenAI has no account-available ${capability} model. Refresh OpenAI in Connections or check account access.`)
   }
@@ -269,6 +304,19 @@ function requireModelCapability(modelId: string, capability: Model['capabilities
     throw new Error(`Choose an account-available ${capability} model in Connections.`)
   }
   return model
+}
+
+function requireReasoningSupport(model: Model, effort?: ReasoningEffort): void {
+  if (effort && !model.reasoningEfforts?.includes(effort)) {
+    throw new Error(`${model.label} does not support the selected thinking level.`)
+  }
+}
+
+function conversationId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{6,80}$/.test(value)) {
+    throw new Error('Conversation identifier is invalid.')
+  }
+  return value
 }
 
 async function refreshConfiguredProviderIds(): Promise<void> {

@@ -3,9 +3,9 @@ import type { Model, ProviderId } from './contracts'
 type Capability = Model['capabilities'][number]
 
 const OPENAI_LIMITS: Partial<Record<Capability, number>> = {
-  text: 5,
+  text: 8,
   image: 2,
-  realtime: 2,
+  realtime: 4,
   transcription: 2,
   research: 2
 }
@@ -33,6 +33,16 @@ export function curateProviderModels(provider: ProviderId, availableIds: string[
   return [...selected.values()].sort(sortModels)
 }
 
+export function defaultModelForCapability(
+  available: Model[],
+  capability: Capability,
+  preferredProvider?: ProviderId
+): Model | undefined {
+  const capable = available.filter((model) => model.capabilities.includes(capability))
+  const preferred = preferredProvider ? capable.filter((model) => model.provider === preferredProvider) : []
+  return (preferred.length ? preferred : capable).slice().sort(compareLatest)[0]
+}
+
 function preferredCapabilityCandidates(capability: Capability, candidates: Model[]): Model[] {
   if (capability === 'image' && candidates.some((model) => model.id.toLowerCase().startsWith('gpt-image'))) {
     return candidates.filter((model) => model.id.toLowerCase().startsWith('gpt-image'))
@@ -52,7 +62,7 @@ function classifyModel(provider: ProviderId, id: string): Model | null {
 
   if (/deep-research/.test(lower)) return model(provider, id, ['research'])
   if (/transcri|whisper/.test(lower)) return model(provider, id, ['transcription'])
-  if (/realtime/.test(lower)) return model(provider, id, ['realtime'])
+  if (/realtime|gpt-live/.test(lower)) return model(provider, id, ['realtime'])
   if (/image|dall-e/.test(lower)) return model(provider, id, ['image'])
   if (/embed|moderation|tts|speech|sora|search|instruct|codex/.test(lower)) return null
   if (/audio/.test(lower)) return null
@@ -64,8 +74,10 @@ function model(provider: ProviderId, id: string, capabilities: Capability[]): Mo
   return {
     id,
     provider,
-    label: id.replaceAll('-', ' '),
-    capabilities
+    label: modelLabel(id),
+    capabilities,
+    // Metadata enriches an ID only after the provider reports it; it never grants or fabricates availability.
+    ...catalogMetadata(id)
   }
 }
 
@@ -90,6 +102,8 @@ function anthropicFamily(model: Model): string {
 
 function openAiTextFamily(model: Model): string {
   const lower = model.id.toLowerCase()
+  const tier = lower.match(/gpt-\d+(?:\.\d+)?-(sol|terra|luna)/)?.[1]
+  if (tier) return `gpt-${tier}`
   const size = /nano/.test(lower) ? 'nano' : /mini/.test(lower) ? 'mini' : /pro/.test(lower) ? 'pro' : 'flagship'
   return `${lower.startsWith('o') ? 'reasoning' : 'gpt'}-${size}`
 }
@@ -114,4 +128,38 @@ function sortModels(a: Model, b: Model): number {
   const aOrder = capabilityOrder.findIndex((capability) => a.capabilities.includes(capability))
   const bOrder = capabilityOrder.findIndex((capability) => b.capabilities.includes(capability))
   return aOrder - bOrder || compareLatest(a, b)
+}
+
+function modelLabel(id: string): string {
+  return id
+    .replace(/^gpt-/i, 'GPT-')
+    .replace(/^claude-/i, 'Claude ')
+    .replaceAll('-', ' ')
+    .replace(/\b(sol|terra|luna|opus|sonnet|haiku)\b/gi, (value) => value[0].toUpperCase() + value.slice(1))
+}
+
+function catalogMetadata(id: string): Partial<Model> {
+  const lower = id.toLowerCase()
+  if (/^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/.test(lower)) {
+    return {
+      contextWindow: 1_050_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+      reasoningModes: ['standard', 'pro']
+    }
+  }
+  if (/^gpt-realtime-2(?:\.\d+)?(?:-|$)/.test(lower)) {
+    return {
+      contextWindow: 128_000,
+      maxOutputTokens: 32_000,
+      reasoningEfforts: ['minimal', 'low', 'medium', 'high', 'xhigh']
+    }
+  }
+  if (/^gpt-(?:[5-9]|\d{2})/.test(lower) || /^o\d/.test(lower)) {
+    return { reasoningEfforts: ['none', 'low', 'medium', 'high', 'xhigh'] }
+  }
+  if (/realtime|gpt-live/.test(lower)) {
+    return { reasoningEfforts: ['minimal', 'low', 'medium', 'high'] }
+  }
+  return {}
 }

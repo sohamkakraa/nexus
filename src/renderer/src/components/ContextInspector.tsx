@@ -1,30 +1,22 @@
 import { useState } from 'react'
 import {
   Activity, FlaskConical, Image, Link2, Search, Settings2, Sparkles,
-  SquareTerminal, Users, X
+  SquareTerminal, X
 } from 'lucide-react'
 import type {
   AppSnapshot,
   Model,
   NexusApi,
-  PlatformCapabilities,
-  ProviderId
+  PlatformCapabilities
 } from '../../../shared/contracts'
-import type { ModelBadgeStyle } from '../preferences'
 import type { WorkflowDraft } from '../workflows'
 
-export function ContextInspector({ api, platform, models, primary, secondary, mode, workflow, jobs, imageModels, badgeStyle, onModel, onError, onClose }: {
+export function ContextInspector({ api, platform, workflow, jobs, imageModels, onError, onClose }: {
   api: NexusApi
   platform: PlatformCapabilities
-  models: Model[]
-  primary: string
-  secondary: string
-  mode: 'solo' | 'council'
   workflow: WorkflowDraft | null
   jobs: AppSnapshot['jobs']
   imageModels: Model[]
-  badgeStyle: ModelBadgeStyle
-  onModel: (id: string, primary: boolean) => void
   onError: (value: string) => void
   onClose: () => void
 }): React.JSX.Element {
@@ -34,36 +26,22 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
   const [terminalOutput, setTerminalOutput] = useState('')
   const [connectorUrl, setConnectorUrl] = useState('')
   const [connectorTools, setConnectorTools] = useState<string[]>([])
-  const primaryProvider = models.find((model) => model.id === primary)?.provider
-  const crossProviderModels = models.filter((model) => model.id !== primary && model.provider !== primaryProvider)
-  const secondaryModels = crossProviderModels
   const advancedWorkflow = ['research', 'image', 'terminal', 'connector'].includes(workflow?.id ?? '')
 
   return <aside className="inspector" aria-label="Context inspector">
     <div className="inspector-head">
-      <div><p className="eyebrow">At the table</p><h2>Context inspector</h2></div>
+      <div><p className="eyebrow">Optional</p><h2>Details & tools</h2></div>
       <button className="icon-button" onClick={onClose} aria-label="Close context inspector"><X size={17} /></button>
     </div>
 
-    <section className="council-seats">
-      <div className="section-title"><Users size={15} /><span>Council seats</span><b>{mode}</b></div>
-      <div className="seat-map" aria-label={`${mode === 'council' ? 'Two' : 'One'} model session`}>
-        <ModelSelect label="Lead" value={primary} models={models} badgeStyle={badgeStyle} onChange={(id) => onModel(id, true)} />
-        <span className="seat-merge" aria-hidden="true"><i /><i /><b /></span>
-        {mode === 'council'
-          ? <ModelSelect label="Challenger" value={secondary} models={secondaryModels} badgeStyle={badgeStyle} onChange={(id) => onModel(id, false)} />
-          : <p className="solo-note">Solo mode returns the lead model directly.</p>}
-      </div>
-    </section>
-
     <section>
-      <div className="section-title"><Sparkles size={15} /><span>Working method</span></div>
+      <div className="section-title"><Sparkles size={15} /><span>Current workflow</span></div>
       {workflow
         ? <div className="workflow-context">
           <strong>{workflow.title}</strong>
           <div>{workflow.context.map((item) => <span key={item}>{item}</span>)}</div>
         </div>
-        : <p className="muted">Choose a workflow to pin its context here.</p>}
+        : <p className="muted">No workflow selected. You can simply write a message.</p>}
     </section>
 
     <details className="advanced-tool-dock" open={advancedWorkflow}>
@@ -136,32 +114,6 @@ export function ContextInspector({ api, platform, models, primary, secondary, mo
       </div>)}
     </section>
   </aside>
-}
-
-function ModelSelect({ label, value, models, badgeStyle, onChange }: {
-  label: string
-  value: string
-  models: Model[]
-  badgeStyle: ModelBadgeStyle
-  onChange: (value: string) => void
-}): React.JSX.Element {
-  const selected = models.find((model) => model.id === value)
-  return <label className="model-seat">
-    <span>{label}<ModelBadge model={selected} style={badgeStyle} /></span>
-    <select value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">Choose model</option>
-      {models.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-    </select>
-  </label>
-}
-
-function ModelBadge({ model, style }: { model?: Model; style: ModelBadgeStyle }): React.JSX.Element | null {
-  if (!model || style === 'minimal') return null
-  return <small>{style === 'provider' ? providerLabel(model.provider) : model.label}</small>
-}
-
-function providerLabel(provider: ProviderId): string {
-  return provider === 'anthropic' ? 'Anthropic' : 'OpenAI'
 }
 
 function messageOf(reason: unknown): string {

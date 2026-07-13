@@ -21,7 +21,6 @@ describe('local workspace preferences', () => {
       emphasis: 'brief' as const,
       motion: 'reduced' as const,
       inspectorDefault: 'closed' as const,
-      modelBadges: 'provider' as const,
       suggestedWorkflows: false
     }
 
@@ -36,6 +35,16 @@ describe('local workspace preferences', () => {
     const storage = new MemoryStorage()
     storage.setItem(PREFERENCE_STORAGE_KEY, '{"version":2,"density":"tiny"}')
     expect(loadPreferences(storage)).toEqual(DEFAULT_PREFERENCES)
+  })
+
+  it('migrates the previously open inspector to a calmer closed default', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(PREFERENCE_STORAGE_KEY, JSON.stringify({
+      ...DEFAULT_PREFERENCES,
+      version: 1,
+      inspectorDefault: 'open'
+    }))
+    expect(loadPreferences(storage)).toMatchObject({ version: 2, inspectorDefault: 'closed' })
   })
 
   it('explains and reverses every adaptation', () => {

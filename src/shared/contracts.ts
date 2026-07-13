@@ -2,12 +2,18 @@ import { z } from 'zod'
 
 export const ProviderSchema = z.enum(['openai', 'anthropic'])
 export type ProviderId = z.infer<typeof ProviderSchema>
+export const ReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>
 
 export const ModelSchema = z.object({
   id: z.string(),
   provider: ProviderSchema,
   label: z.string(),
-  capabilities: z.array(z.enum(['text', 'vision', 'image', 'realtime', 'transcription', 'tools', 'research']))
+  capabilities: z.array(z.enum(['text', 'vision', 'image', 'realtime', 'transcription', 'tools', 'research'])),
+  contextWindow: z.number().int().positive().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  reasoningEfforts: z.array(ReasoningEffortSchema).optional(),
+  reasoningModes: z.array(z.enum(['standard', 'pro'])).optional()
 })
 export type Model = z.infer<typeof ModelSchema>
 
@@ -36,6 +42,8 @@ export const ConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
   mode: z.enum(['solo', 'council']),
+  pinned: z.boolean().default(false),
+  archived: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
   messages: z.array(MessageSchema).default([])
@@ -48,6 +56,9 @@ export const ChatRequestSchema = z.object({
   mode: z.enum(['solo', 'council']),
   primaryModel: z.string(),
   secondaryModel: z.string().optional(),
+  primaryReasoningEffort: ReasoningEffortSchema.optional(),
+  secondaryReasoningEffort: ReasoningEffortSchema.optional(),
+  reasoningMode: z.enum(['standard', 'pro']).optional(),
   attachmentIds: z.array(z.string()).max(10).default([])
 }).superRefine((request, context) => {
   if (request.mode === 'council' && (!request.secondaryModel || request.secondaryModel === request.primaryModel)) {
@@ -136,11 +147,14 @@ export type NexusApi = {
   removeProviderKey(provider: ProviderId): Promise<void>
   discoverModels(provider: ProviderId): Promise<Model[]>
   createConversation(mode: 'solo' | 'council'): Promise<Conversation>
+  setConversationPinned(id: string, pinned: boolean): Promise<void>
+  setConversationArchived(id: string, archived: boolean): Promise<void>
+  deleteConversation(id: string): Promise<void>
   sendMessage(request: ChatRequest): Promise<Message>
   selectFiles(): Promise<Attachment[]>
   generateImage(prompt: string, model: string): Promise<JobState>
   transcribeFile(): Promise<JobState | null>
-  createRealtimeSession(model: string): Promise<{ clientSecret: string; model: string }>
+  createRealtimeSession(model: string, reasoningEffort?: ReasoningEffort): Promise<{ clientSecret: string; model: string }>
   saveRecording(data: Uint8Array, mime: string): Promise<JobState>
   startResearch(request: z.input<typeof ResearchRequestSchema>): Promise<JobState>
   cancelJob(id: string): Promise<void>
