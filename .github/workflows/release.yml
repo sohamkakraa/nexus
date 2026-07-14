@@ -221,7 +221,7 @@ jobs:
             --out release-assets
       - name: Attest build provenance
         continue-on-error: true
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: release-assets/*
       - uses: actions/upload-artifact@v5
@@ -275,7 +275,7 @@ jobs:
         run: node scripts/write-release-checksums.mjs release-assets
       - name: Attest assembled release bundle
         continue-on-error: true
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             release-assets/release-manifest.json
@@ -298,7 +298,7 @@ jobs:
           retention-days: 30
       - name: Publish signed GitHub release
         if: steps.manifest.outputs.publishable == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Nexus ${{ needs.verify-tag.outputs.version }}${{ steps.manifest.outputs.channel == 'prerelease' && ' — prerelease' || '' }}
           prerelease: ${{ steps.manifest.outputs.channel == 'prerelease' }}
