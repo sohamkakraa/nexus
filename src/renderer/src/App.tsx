@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity, Archive, ArchiveRestore, ArrowRight, Bot, ChevronDown, FilePlus2,
-  KeyRound, Menu, Mic, Moon, Paperclip, Pin, PinOff, Plus, Send, ShieldCheck,
-  Sparkles, Sun, Trash2, Users, X
+  FolderGit2, KeyRound, Menu, Mic, Moon, Paperclip, Pin, PinOff, Plus, Send,
+  ShieldCheck, Sparkles, Sun, Trash2, Unplug, Users, X
 } from 'lucide-react'
 import type {
   AppSnapshot, Attachment, Conversation, Model, NexusApi, ReasoningEffort
@@ -38,7 +38,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null)
   const [loadError, setLoadError] = useState('')
   const [activeId, setActiveId] = useState('')
-  const [mode, setMode] = useState<'solo' | 'council'>('council')
+  const [mode, setMode] = useState<'solo' | 'council'>('solo')
   const [primaryModel, setPrimaryModel] = useState('')
   const [secondaryModel, setSecondaryModel] = useState('')
   const [primaryReasoning, setPrimaryReasoning] = useState<ReasoningEffort | undefined>()
@@ -54,7 +54,9 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
   const [editorOpen, setEditorOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [callOpen, setCallOpen] = useState(false)
-  const [conversationToDelete, setConversationToDelete] = useState<Conversation | null>(null)
+  const [historySelectionMode, setHistorySelectionMode] = useState(false)
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([])
+  const [conversationsToDelete, setConversationsToDelete] = useState<Conversation[]>([])
   const [mainView, setMainView] = useState<MainView>('work')
   const [workflow, setWorkflow] = useState<WorkflowDraft | null>(null)
   const [preferences, setPreferences] = useState<WorkspacePreferences>(() => loadPreferences())
@@ -127,8 +129,9 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       setPrimaryReasoning(undefined)
     }
     const selectedSecondary = textModels.find((model) => model.id === secondaryModel)
-    if (!selectedSecondary || selectedSecondary.provider === selectedPrimary.provider) {
+    if (!selectedSecondary || selectedSecondary.id === selectedPrimary.id) {
       const other = textModels.find((model) => model.provider !== selectedPrimary.provider)
+        ?? textModels.find((model) => model.id !== selectedPrimary.id)
       setSecondaryModel(other?.id ?? '')
       setSecondaryReasoning(defaultReasoning(other))
     } else if (selectedSecondary.reasoningEfforts?.length && !selectedSecondary.reasoningEfforts.includes(secondaryReasoning ?? 'none')) {
@@ -187,10 +190,11 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
 
   async function chooseWorkflow(definition: WorkflowDefinition): Promise<void> {
     const next = configureWorkflow(definition.id)
-    const conversation = await createConversation(next.mode)
+    const effectiveMode = next.mode === 'council' && textModels.length < 2 ? 'solo' : next.mode
+    const conversation = await createConversation(effectiveMode)
     if (!conversation) return
-    setWorkflow(next)
-    setMode(next.mode)
+    setWorkflow({ ...next, mode: effectiveMode })
+    setMode(effectiveMode)
     setDraft(next.instruction)
     setMainView('work')
     setLibraryOpen(false)
@@ -220,7 +224,7 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
   async function send(): Promise<void> {
     if (!draft.trim() || !primaryModel || sending) return
     if (mode === 'council' && !councilReady) {
-      setError('Council mode needs one connected OpenAI model and one connected Anthropic model.')
+      setError('Council mode needs two distinct account-available text models.')
       return
     }
     setError('')
@@ -267,12 +271,36 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     }
   }
 
+  async function connectWorkspace(): Promise<void> {
+    try {
+      let conversationId = activeId
+      if (!conversationId) {
+        const conversation = await createConversation(mode)
+        if (!conversation) return
+        conversationId = conversation.id
+      }
+      await nexusApi.selectConversationWorkspace(conversationId)
+    } catch (reason) {
+      setError(messageOf(reason))
+    }
+  }
+
+  async function clearWorkspace(): Promise<void> {
+    if (!activeId) return
+    try {
+      await nexusApi.clearConversationWorkspace(activeId)
+    } catch (reason) {
+      setError(messageOf(reason))
+    }
+  }
+
   function chooseModel(id: string, primary: boolean): void {
     if (primary) {
       setPrimaryModel(id)
       setPrimaryReasoning(defaultReasoning(textModels.find((model) => model.id === id)))
       const provider = textModels.find((model) => model.id === id)?.provider
       const challenger = textModels.find((model) => model.provider !== provider)
+        ?? textModels.find((model) => model.id !== id)
       setSecondaryModel(challenger?.id ?? '')
       setSecondaryReasoning(defaultReasoning(challenger))
     } else {
@@ -307,19 +335,37 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     }
   }
 
-  async function removeConversation(conversation: Conversation): Promise<void> {
+  async function removeConversations(conversations: Conversation[]): Promise<void> {
     try {
-      await nexusApi.deleteConversation(conversation.id)
-      if (conversation.id === activeId) setActiveId('')
-      setConversationToDelete(null)
+      await Promise.all(conversations.map((conversation) => nexusApi.deleteConversation(conversation.id)))
+      if (conversations.some((conversation) => conversation.id === activeId)) setActiveId('')
+      setConversationsToDelete([])
+      setSelectedHistoryIds([])
+      setHistorySelectionMode(false)
     } catch (reason) {
       setError(messageOf(reason))
     }
   }
 
-  const primaryProvider = textModels.find((model) => model.id === primaryModel)?.provider
-  const secondaryProvider = textModels.find((model) => model.id === secondaryModel)?.provider
-  const councilReady = Boolean(primaryModel && secondaryModel && primaryModel !== secondaryModel && primaryProvider !== secondaryProvider)
+  async function archiveSelectedConversations(): Promise<void> {
+    const selected = currentSnapshot.conversations.filter((conversation) => selectedHistoryIds.includes(conversation.id))
+    try {
+      await Promise.all(selected.map((conversation) => nexusApi.setConversationArchived(conversation.id, true)))
+      if (selected.some((conversation) => conversation.id === activeId)) setActiveId('')
+      setSelectedHistoryIds([])
+      setHistorySelectionMode(false)
+    } catch (reason) {
+      setError(messageOf(reason))
+    }
+  }
+
+  function toggleHistorySelection(id: string): void {
+    setSelectedHistoryIds((current) => current.includes(id)
+      ? current.filter((selected) => selected !== id)
+      : [...current, id])
+  }
+
+  const councilReady = Boolean(primaryModel && secondaryModel && primaryModel !== secondaryModel)
   const reasoningModeAvailable = Boolean(
     textModels.find((model) => model.id === primaryModel)?.reasoningModes?.length
     || (mode === 'council' && textModels.find((model) => model.id === secondaryModel)?.reasoningModes?.length)
@@ -342,7 +388,10 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
       <div className="traffic-space" />
       <div className="brand"><NexusMark /><span><strong>Nexus</strong><small>Think with two models</small></span><button className="icon-button sidebar-menu" aria-label="Open commands" onClick={() => setPaletteOpen(true)}><Menu size={17} /></button></div>
       <button className="new-work" onClick={() => setLibraryOpen(true)}><Plus size={16} /><span>New conversation</span><kbd>⌘N</kbd></button>
-      <div className="sidebar-label history-label">Conversations</div>
+      <div className="sidebar-label history-label"><span>Conversations</span><button onClick={() => {
+        setHistorySelectionMode((value) => !value)
+        setSelectedHistoryIds([])
+      }}>{historySelectionMode ? 'Done' : 'Select'}</button></div>
       <nav className="work-list" aria-label="Local work history">
         {visibleConversations.map((conversation) => <HistoryRow
           key={conversation.id}
@@ -351,7 +400,10 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
           onOpen={openWork}
           onPin={(item) => void togglePinned(item)}
           onArchive={(item) => void toggleArchived(item)}
-          onDelete={setConversationToDelete}
+          onDelete={(item) => setConversationsToDelete([item])}
+          selectionMode={historySelectionMode}
+          selected={selectedHistoryIds.includes(conversation.id)}
+          onSelect={toggleHistorySelection}
         />)}
         {!visibleConversations.length && snapshot ? <p className="empty-sidebar">No conversations yet.</p> : null}
         {archivedConversations.length ? <details className="archived-history">
@@ -363,10 +415,14 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
             onOpen={openWork}
             onPin={(item) => void togglePinned(item)}
             onArchive={(item) => void toggleArchived(item)}
-            onDelete={setConversationToDelete}
+            onDelete={(item) => setConversationsToDelete([item])}
+            selectionMode={historySelectionMode}
+            selected={selectedHistoryIds.includes(conversation.id)}
+            onSelect={toggleHistorySelection}
           />)}</div>
         </details> : null}
       </nav>
+      {selectedHistoryIds.length ? <div className="bulk-history-actions"><span>{selectedHistoryIds.length} selected</span><button onClick={() => void archiveSelectedConversations()}><Archive size={13} /> Archive</button><button className="danger-button" onClick={() => setConversationsToDelete(currentSnapshot.conversations.filter((conversation) => selectedHistoryIds.includes(conversation.id)))}><Trash2 size={13} /> Delete</button></div> : null}
       <div className="sidebar-footer">
         <details className="local-history"><summary><ShieldCheck size={14} /> Stored on this device</summary><p>Work history and permissions stay local. Requests go only to providers and connectors you explicitly use.</p></details>
         <div><button onClick={() => setSettingsOpen(true)}><KeyRound size={15} /> Connections</button><button onClick={() => {
@@ -380,7 +436,18 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     <main className="workspace" id="main-content" aria-label="Council workspace">
       <header className="topbar">
         <div><p className="eyebrow">{mainView === 'work' ? (workflow?.title ?? 'Conversation') : mainView === 'preferences' ? 'Appearance' : 'Diagnostics'}</p><h1>{mainView === 'work' ? (active?.title ?? 'New conversation') : mainView === 'preferences' ? 'Make Nexus feel like yours' : 'Check your setup'}</h1></div>
-        <div className="top-actions">{!online ? <span className="offline-chip"><i /> Offline</span> : null}{mainView === 'work' ? <>{realtimeModels.length ? <button className="quiet-button" onClick={() => setCallOpen(true)}><Mic size={16} /> Voice</button> : null}<button className="quiet-button" onClick={() => setLibraryOpen(true)}><Sparkles size={16} /> Workflow</button><button className="icon-button" aria-label={inspectorOpen ? 'Hide context inspector' : 'Show context inspector'} onClick={() => setInspectorOpen((value) => !value)}><Activity size={18} /></button></> : null}</div>
+        <div className="top-actions">
+          {!online ? <span className="offline-chip"><i /> Offline</span> : null}
+          {mainView === 'work' ? <>
+            <div className="workspace-binding">
+              <button className="quiet-button" onClick={() => void connectWorkspace()}><FolderGit2 size={16} /> {active?.workspaceName ?? 'Connect folder'}</button>
+              {active?.workspacePath ? <button className="icon-button" aria-label={`Disconnect ${active.workspaceName ?? 'folder'}`} onClick={() => void clearWorkspace()}><Unplug size={15} /></button> : null}
+            </div>
+            {realtimeModels.length ? <button className="quiet-button" onClick={() => setCallOpen(true)}><Mic size={16} /> Voice</button> : null}
+            <button className="quiet-button" onClick={() => setLibraryOpen(true)}><Sparkles size={16} /> Workflow</button>
+            <button className="icon-button" aria-label={inspectorOpen ? 'Hide context inspector' : 'Show context inspector'} onClick={() => setInspectorOpen((value) => !value)}><Activity size={18} /></button>
+          </> : null}
+        </div>
       </header>
       {!online ? <div className="offline-banner" role="status"><strong>You are offline.</strong> Local history and workspace choices still work. Provider and connector actions will wait for a connection.</div> : null}
       {mainView === 'preferences' ? <div className="surface-scroll"><PreferenceStudio preferences={preferences} onChange={updatePreferences} onReset={() => {
@@ -434,14 +501,14 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
                 void send()
               }
             }} />
-            <div className="composer-tools"><button className="icon-button" onClick={() => void addFiles()} aria-label="Attach local files"><Paperclip size={18} /></button><button className="mode-switch" onClick={() => setMode(mode === 'solo' ? 'council' : 'solo')}>{mode === 'council' ? <Users size={15} /> : <Bot size={15} />}{mode === 'council' ? 'Council' : 'Solo'}<ChevronDown size={13} /></button><span className="composer-safety">{mode === 'council' ? (councilReady ? 'Two perspectives, one answer' : 'Connect OpenAI and Anthropic') : 'One model answers directly'}</span><div className="spacer" /><span className="file-count">{attachments.length}/10</span><button className="send-button" onClick={() => void send()} disabled={!draft.trim() || !primaryModel || sending || (mode === 'council' && !councilReady)}><span>{sending ? 'Working' : 'Send'}</span><Send size={16} /></button></div>
+            <div className="composer-tools"><button className="icon-button" onClick={() => void addFiles()} aria-label="Attach local files"><Paperclip size={18} /></button><button className="mode-switch" onClick={() => setMode(mode === 'solo' ? 'council' : 'solo')}>{mode === 'council' ? <Users size={15} /> : <Bot size={15} />}{mode === 'council' ? 'Council' : 'Solo'}<ChevronDown size={13} /></button><span className="composer-safety">{mode === 'council' ? (councilReady ? 'Two perspectives, one answer' : 'Choose a different challenger') : 'One model answers directly'}</span><div className="spacer" /><span className="file-count">{attachments.length}/10</span><button className="send-button" onClick={() => void send()} disabled={!draft.trim() || !primaryModel || sending || (mode === 'council' && !councilReady)}><span>{sending ? 'Working' : 'Send'}</span><Send size={16} /></button></div>
           </div>
           <p className="composer-note">⌘ Enter sends · consequential actions still ask for approval</p>
         </section>
       </> : null}
     </main>
 
-    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} platform={currentSnapshot.platform} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
+    {inspectorOpen && mainView === 'work' ? <ContextInspector api={nexusApi} platform={currentSnapshot.platform} workspacePath={active?.workspacePath} workflow={workflow} jobs={currentSnapshot.jobs} imageModels={imageModels} onError={setError} onClose={() => setInspectorOpen(false)} /> : null}
     {settingsOpen ? <Connections api={nexusApi} snapshot={currentSnapshot} onClose={() => setSettingsOpen(false)} onError={setError} /> : null}
     {libraryOpen ? <div className="modal-backdrop" onMouseDown={() => setLibraryOpen(false)}><div className="modal workflow-modal" role="dialog" aria-modal="true" aria-label="Workflow library" onMouseDown={(event) => event.stopPropagation()}><WorkflowLibrary onChoose={chooseWorkflow} onClose={() => setLibraryOpen(false)} /></div></div> : null}
     {editorOpen && workflow ? <WorkflowEditor workflow={workflow} onClose={() => setEditorOpen(false)} onSave={(next) => {
@@ -452,29 +519,33 @@ export function App({ api }: { api?: NexusApi }): React.JSX.Element {
     }} /> : null}
     {paletteOpen ? <CommandPalette onClose={() => setPaletteOpen(false)} actions={commandActions} /> : null}
     {callOpen ? <CallPanel api={nexusApi} models={realtimeModels} onClose={() => setCallOpen(false)} onError={setError} /> : null}
-    {conversationToDelete ? <div className="modal-backdrop" onMouseDown={() => setConversationToDelete(null)}><div className="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">Delete local history</p><h2 id="delete-conversation-title">Delete this conversation?</h2></div></div><p className="modal-intro">“{conversationToDelete.title}” and its local messages will be permanently removed.</p><div className="modal-actions"><button onClick={() => setConversationToDelete(null)}>Cancel</button><button className="danger-button" onClick={() => void removeConversation(conversationToDelete)}>Delete conversation</button></div></div></div> : null}
+    {conversationsToDelete.length ? <div className="modal-backdrop" onMouseDown={() => setConversationsToDelete([])}><div className="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-conversation-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">Delete local history</p><h2 id="delete-conversation-title">Delete {conversationsToDelete.length === 1 ? 'this conversation' : `${conversationsToDelete.length} conversations`}?</h2></div></div><p className="modal-intro">{conversationsToDelete.length === 1 ? `“${conversationsToDelete[0].title}” and its local messages` : 'The selected conversations and their local messages'} will be permanently removed.</p><div className="modal-actions"><button onClick={() => setConversationsToDelete([])}>Cancel</button><button className="danger-button" onClick={() => void removeConversations(conversationsToDelete)}>Delete {conversationsToDelete.length === 1 ? 'conversation' : 'selected'}</button></div></div></div> : null}
   </div>
 }
 
-function HistoryRow({ conversation, active, onOpen, onPin, onArchive, onDelete }: {
+function HistoryRow({ conversation, active, selectionMode, selected, onOpen, onPin, onArchive, onDelete, onSelect }: {
   conversation: Conversation
   active: boolean
+  selectionMode: boolean
+  selected: boolean
   onOpen: (conversation: Conversation) => void
   onPin: (conversation: Conversation) => void
   onArchive: (conversation: Conversation) => void
   onDelete: (conversation: Conversation) => void
+  onSelect: (id: string) => void
 }): React.JSX.Element {
-  return <div className={active ? 'history-row active' : 'history-row'}>
-    <button className="work-item" onClick={() => onOpen(conversation)}>
+  return <div className={`${active ? 'history-row active' : 'history-row'}${selected ? ' selected' : ''}${selectionMode ? ' selecting' : ''}`}>
+    {selectionMode ? <input type="checkbox" aria-label={`Select ${conversation.title}`} checked={selected} onChange={() => onSelect(conversation.id)} /> : null}
+    <button className="work-item" onClick={() => selectionMode ? onSelect(conversation.id) : onOpen(conversation)}>
       <span className="work-mode">{conversation.mode === 'council' ? <Users size={14} /> : <Bot size={14} />}</span>
       <span>{conversation.title}</span>
       {conversation.pinned ? <Pin size={12} aria-label="Pinned" /> : <time>{relativeTime(conversation.updatedAt)}</time>}
     </button>
-    <div className="history-actions">
+    {!selectionMode ? <div className="history-actions">
       {!conversation.archived ? <button onClick={() => onPin(conversation)} aria-label={conversation.pinned ? `Unpin ${conversation.title}` : `Pin ${conversation.title}`}>{conversation.pinned ? <PinOff size={13} /> : <Pin size={13} />}</button> : null}
       <button onClick={() => onArchive(conversation)} aria-label={conversation.archived ? `Restore ${conversation.title}` : `Archive ${conversation.title}`}>{conversation.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}</button>
       <button onClick={() => onDelete(conversation)} aria-label={`Delete ${conversation.title}`}><Trash2 size={13} /></button>
-    </div>
+    </div> : null}
   </div>
 }
 
@@ -495,7 +566,7 @@ function ModelControls({ models, mode, primary, secondary, primaryReasoning, sec
 }): React.JSX.Element {
   const lead = models.find((model) => model.id === primary)
   const challenger = models.find((model) => model.id === secondary)
-  const challengerModels = models.filter((model) => model.provider !== lead?.provider)
+  const challengerModels = models.filter((model) => model.id !== lead?.id)
   const proSupported = lead?.reasoningModes?.includes('pro') || challenger?.reasoningModes?.includes('pro')
 
   if (!models.length) {
@@ -506,6 +577,7 @@ function ModelControls({ models, mode, primary, secondary, primaryReasoning, sec
     <SeatModelControl label="Lead" model={lead} models={models} value={primary} reasoning={primaryReasoning} onModel={onPrimary} onReasoning={onPrimaryReasoning} />
     {mode === 'council' ? <SeatModelControl label="Challenger" model={challenger} models={challengerModels} value={secondary} reasoning={secondaryReasoning} onModel={onSecondary} onReasoning={onSecondaryReasoning} /> : null}
     {proSupported ? <label className="reasoning-mode-control"><span>Mode</span><select value={reasoningMode} onChange={(event) => onReasoningMode(event.target.value as 'standard' | 'pro')}><option value="standard">Standard</option><option value="pro">Pro</option></select></label> : null}
+    <p className="model-source-note">Only models returned by your connected API project appear here. Refresh Connections after provider access changes.</p>
   </section>
 }
 
@@ -534,7 +606,7 @@ function Welcome({ configuredProviders, showSuggestions, onWorkflow, onBrowse, o
 }): React.JSX.Element {
   return <section className="welcome" aria-labelledby="welcome-title">
     <div className="council-table" aria-label="Two model perspectives converge into one synthesis"><div className="model-position first"><i />Lead perspective</div><div className="model-position second"><i />Challenge perspective</div><div className="convergence" aria-hidden="true"><i /><i /><b /></div><div className="synthesis-position"><NexusMark compact />Synthesis</div></div>
-    <p className="eyebrow">OpenAI and Anthropic, together</p><h2 id="welcome-title">Start with a question.</h2><p>Use one model for a quick answer, or let two models challenge each other before Nexus responds.</p>
+    <p className="eyebrow">Two models, one clear answer</p><h2 id="welcome-title">Start with a question.</h2><p>Use one model for a quick answer, or let any two available models challenge each other before Nexus responds.</p>
     <div className="welcome-actions"><button className="primary-action" onClick={onBrowse}>Start with a workflow <ArrowRight size={16} /></button>{configuredProviders < 2 ? <button className="secondary-action" onClick={onConnect}>Connect providers</button> : null}</div>
     {showSuggestions ? <div className="suggestion-row" aria-label="Suggested workflows">{WORKFLOWS.slice(0, 3).map((item) => <button key={item.id} onClick={() => onWorkflow(item)}><span>{item.shortLabel}</span><small>{item.description}</small></button>)}</div> : null}
   </section>

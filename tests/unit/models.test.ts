@@ -111,4 +111,24 @@ describe('provider model curation', () => {
     expect(defaultModelForCapability(models, 'image', 'openai')?.id).toBe('gpt-image-3')
     expect(defaultModelForCapability(models, 'realtime', 'openai')?.id).toBe('gpt-realtime-2.1')
   })
+
+  it('preserves provider-reported release and thinking metadata', () => {
+    const models = curateProviderModels('anthropic', [{
+      id: 'claude-future-model',
+      label: 'Claude Future Model',
+      created: 1_800_000_000,
+      contextWindow: 750_000,
+      maxOutputTokens: 64_000,
+      reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+      supportsAdaptiveThinking: true
+    }])
+    expect(models[0]).toMatchObject({
+      id: 'claude-future-model',
+      label: 'Claude Future Model',
+      releasedAt: 1_800_000_000,
+      contextWindow: 750_000,
+      reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+      supportsAdaptiveThinking: true
+    })
+  })
 })

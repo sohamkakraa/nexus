@@ -27,10 +27,23 @@ const MODELS: Model[] = [
     reasoningModes: ['standard', 'pro']
   },
   {
+    id: 'gpt-5.6-terra',
+    provider: 'openai',
+    label: 'GPT-5.6 Terra',
+    capabilities: ['text', 'vision', 'tools'],
+    contextWindow: 1_050_000,
+    maxOutputTokens: 128_000,
+    reasoningEfforts: ['none', 'low', 'medium', 'high', 'xhigh']
+  },
+  {
     id: 'claude-sonnet-5',
     provider: 'anthropic',
     label: 'Claude Sonnet 5',
-    capabilities: ['text', 'vision', 'tools']
+    capabilities: ['text', 'vision', 'tools'],
+    contextWindow: 1_000_000,
+    maxOutputTokens: 128_000,
+    reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsAdaptiveThinking: true
   }
 ]
 
@@ -82,6 +95,15 @@ export const PERSONAS: Record<PersonaId, PersonaScenario> = {
         archived: false,
         createdAt: '2026-07-10T10:00:00.000Z',
         updatedAt: '2026-07-10T10:00:00.000Z',
+        messages: []
+      }, {
+        id: 'work-release',
+        title: 'Release planning',
+        mode: 'solo',
+        pinned: false,
+        archived: false,
+        createdAt: '2026-07-09T10:00:00.000Z',
+        updatedAt: '2026-07-09T10:00:00.000Z',
         messages: []
       }],
       jobs: [{ id: 'job-1', kind: 'tool', label: 'Index repository', status: 'running', progress: 42 }]

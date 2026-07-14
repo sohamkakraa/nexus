@@ -130,7 +130,7 @@ export function Connections({ api, snapshot, onClose, onError }: {
         <div><p className="eyebrow">Bring your own models</p><h2 id="connections-title">Connections</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close connections"><X size={18} /></button>
       </div>
-      <p className="modal-intro">Keys are stored in {snapshot.platform.credentialStore}. Connecting checks the provider’s model list; it does not make a generation request.</p>
+      <p className="modal-intro">Keys are stored in {snapshot.platform.credentialStore}. Nexus asks each API project for its currently available models at launch and refresh; it never substitutes consumer-app models or invents access.</p>
       {connectionError ? <div className="modal-error" role="alert">{connectionError}<button onClick={() => setConnectionError('')} aria-label="Dismiss connection error"><X size={13} /></button></div> : null}
       {(['openai', 'anthropic'] as ProviderId[]).map((provider) => {
         const connected = snapshot.configuredProviders.includes(provider)

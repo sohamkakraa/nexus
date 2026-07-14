@@ -263,7 +263,7 @@ export function DiagnosticsSurface({ api, snapshot, onUseConversation, onOpenCon
         <div className="diagnostic-icon"><Network size={17} /></div>
         <div>
           <h3>Provider connectivity</h3>
-          <p>Explicitly requests the selected provider’s model list. It does not generate tokens or content.</p>
+          <p>Refresh checks the account model list without generation. Response test sends one tiny paid request only when you click it.</p>
           <div className="inline-controls">
             <select aria-label="Provider to test" value={provider} onChange={(event) => setProvider(event.target.value as ProviderId)}>
               <option value="openai">OpenAI</option>
@@ -272,12 +272,22 @@ export function DiagnosticsSurface({ api, snapshot, onUseConversation, onOpenCon
             <button onClick={() => onOpenConnections()}>Connections</button>
           </div>
           <DiagnosticResultView result={resultFor('provider')} />
+          <DiagnosticResultView result={resultFor('provider-response')} />
         </div>
-        <button onClick={() => void run('provider', async () => {
-          if (!snapshot.configuredProviders.includes(provider)) throw new Error(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} is not connected.`)
-          const models = await api.discoverModels(provider)
-          return `${models.length} models returned. No generation request was made.`
-        })}>Test provider</button>
+        <div className="diagnostic-actions">
+          <button onClick={() => void run('provider', async () => {
+            if (!snapshot.configuredProviders.includes(provider)) throw new Error(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} is not connected.`)
+            const models = await api.discoverModels(provider)
+            return `${models.length} models returned. No generation request was made.`
+          })}>Refresh models</button>
+          <button onClick={() => void run('provider-response', async () => {
+            if (!snapshot.configuredProviders.includes(provider)) throw new Error(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} is not connected.`)
+            const models = await api.discoverModels(provider)
+            const model = models.find((item) => item.capabilities.includes('text'))
+            if (!model) throw new Error('No text model is available for this API project.')
+            return `${model.label}: ${await api.testModelResponse(model.id)}`
+          })}>Test response</button>
+        </div>
       </article>
 
       <article className="diagnostic-card external-check">

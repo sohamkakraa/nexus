@@ -3,6 +3,7 @@ import type { Attachment, ChatRequest, Message, ProviderId } from '../shared/con
 import { insertMessage, listConversations, refreshRollingMemory, renameConversation, rollingMemory, searchMemory } from './database'
 import { getPrivacySettings } from './privacy'
 import { generate, generateStreaming } from './providers'
+import { workspaceContext } from './workspace'
 
 const BASE_SYSTEM = `You are participating in Nexus, a careful desktop AI assistant.
 Give direct, useful answers. Use supplied files as evidence and state uncertainty.
@@ -22,7 +23,8 @@ export async function runChat(
     id: nanoid(), conversationId: request.conversationId, role: 'user',
     content: request.content, createdAt: now, attachments
   }
-  const context = buildContext(conversation.messages, request.content, conversation.id)
+  const connectedWorkspace = await workspaceContext(conversation.workspacePath)
+  const context = buildContext(conversation.messages, request.content, conversation.id, connectedWorkspace)
   const system = await systemPrompt()
   const content = request.mode === 'council' && request.secondaryModel
     ? await runCouncil(request, context, attachments, system, signal, onDelta)
@@ -91,13 +93,14 @@ async function runCouncil(
   }, onDelta)
 }
 
-function buildContext(messages: Message[], prompt: string, conversationId: string): string {
+function buildContext(messages: Message[], prompt: string, conversationId: string, connectedWorkspace: string): string {
   const recent = messages.slice(-14).map((message) => `${message.role.toUpperCase()}: ${message.content}`).join('\n\n')
   const memories = searchMemory(conversationId, prompt).filter((item) => !recent.includes(item))
   const summary = rollingMemory(conversationId)
   return [
     summary ? `Rolling conversation memory:\n${summary}` : '',
     memories.length ? `Relevant earlier context:\n${memories.join('\n---\n')}` : '',
+    connectedWorkspace ? `Local repository context approved for this conversation:\n${connectedWorkspace}` : '',
     recent ? `Recent conversation:\n${recent}` : '',
     `Current request:\n${prompt}`
   ].filter(Boolean).join('\n\n')

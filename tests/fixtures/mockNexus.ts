@@ -67,6 +67,10 @@ export function createMockNexus(scenario: PersonaScenario): MockNexus {
       record('discoverModels', provider)
       return structuredClone(current.models.filter((model) => model.provider === provider))
     },
+    async testModelResponse(model) {
+      record('testModelResponse', model)
+      return 'Nexus connection ready.'
+    },
     async createConversation(mode) {
       record('createConversation', mode)
       const now = new Date().toISOString()
@@ -102,6 +106,26 @@ export function createMockNexus(scenario: PersonaScenario): MockNexus {
     async deleteConversation(id) {
       record('deleteConversation', id)
       current.conversations = current.conversations.filter((item) => item.id !== id)
+      emit()
+    },
+    async selectConversationWorkspace(id) {
+      record('selectConversationWorkspace', id)
+      const conversation = current.conversations.find((item) => item.id === id)
+      const workspace = { path: '/mock/repository', name: 'repository' }
+      if (conversation) {
+        conversation.workspacePath = workspace.path
+        conversation.workspaceName = workspace.name
+      }
+      emit()
+      return workspace
+    },
+    async clearConversationWorkspace(id) {
+      record('clearConversationWorkspace', id)
+      const conversation = current.conversations.find((item) => item.id === id)
+      if (conversation) {
+        conversation.workspacePath = undefined
+        conversation.workspaceName = undefined
+      }
       emit()
     },
     async sendMessage(request: ChatRequest) {
