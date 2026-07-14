@@ -19,10 +19,35 @@ export type GenerateOptions = {
 export async function discoverProviderModels(provider: ProviderId, candidateKey?: string): Promise<Model[]> {
   const key = candidateKey ?? await requireKey(provider)
   return providerRequest(provider, async () => {
-    const ids = provider === 'openai'
-      ? (await new OpenAI({ apiKey: key }).models.list()).data.map((entry) => entry.id)
-      : (await new Anthropic({ apiKey: key }).models.list({ limit: 100 })).data.map((entry) => entry.id)
-    return curateProviderModels(provider, ids)
+    if (provider === 'openai') {
+      const offerings = (await new OpenAI({ apiKey: key }).models.list()).data.map((entry) => ({
+        id: entry.id,
+        created: entry.created
+      }))
+      return curateProviderModels(provider, offerings)
+    }
+    const page = await new Anthropic({ apiKey: key }).models.list({ limit: 100 })
+    const entries = []
+    for await (const entry of page) entries.push(entry)
+    const offerings = entries.map((entry) => {
+      const effort = entry.capabilities?.effort
+      const levels = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+      const reasoningEfforts = effort?.supported
+        ? levels.filter((level) => level === 'xhigh'
+          ? effort.xhigh?.supported
+          : effort[level].supported)
+        : []
+      return {
+        id: entry.id,
+        label: entry.display_name,
+        created: Math.max(0, Math.floor(Date.parse(entry.created_at) / 1_000)),
+        ...(entry.max_input_tokens ? { contextWindow: entry.max_input_tokens } : {}),
+        ...(entry.max_tokens ? { maxOutputTokens: entry.max_tokens } : {}),
+        ...(reasoningEfforts.length ? { reasoningEfforts: [...reasoningEfforts] } : {}),
+        supportsAdaptiveThinking: Boolean(entry.capabilities?.thinking.types.adaptive.supported)
+      }
+    })
+    return curateProviderModels(provider, offerings)
   })
 }
 
@@ -64,8 +89,12 @@ export async function generateStreaming(
     }
     const stream = new Anthropic({ apiKey: key }).messages.stream({
       model: options.model,
-      max_tokens: 4096,
+      max_tokens: options.reasoningEffort ? 16_384 : 4_096,
       system: options.system,
+      ...(options.reasoningEffort ? {
+        thinking: { type: 'adaptive' as const },
+        output_config: { effort: anthropicEffort(options.reasoningEffort) }
+      } : {}),
       messages: [{ role: 'user', content: options.prompt }]
     }, { signal: options.signal })
     let complete = ''
@@ -201,8 +230,12 @@ async function generateAnthropic(key: string, options: GenerateOptions): Promise
   content.push({ type: 'text', text: options.prompt })
   const response = await new Anthropic({ apiKey: key }).messages.create({
     model: options.model,
-    max_tokens: 4096,
+    max_tokens: options.reasoningEffort ? 16_384 : 4_096,
     system: options.system,
+    ...(options.reasoningEffort ? {
+      thinking: { type: 'adaptive' as const },
+      output_config: { effort: anthropicEffort(options.reasoningEffort) }
+    } : {}),
     messages: [{ role: 'user', content: content as never }]
   }, { signal: options.signal })
   return response.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n').trim()
@@ -237,4 +270,9 @@ function reasoningConfig(options: GenerateOptions): Record<string, string> | und
     ...(options.reasoningEffort ? { effort: options.reasoningEffort } : {}),
     ...(options.reasoningMode ? { mode: options.reasoningMode } : {})
   }
+}
+
+function anthropicEffort(effort: ReasoningEffort): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
+  if (effort === 'none' || effort === 'minimal') return 'low'
+  return effort
 }

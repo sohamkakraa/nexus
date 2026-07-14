@@ -12,9 +12,10 @@ import type {
 import type { WorkflowDraft } from '../workflows'
 import { messageOf } from '../errors'
 
-export function ContextInspector({ api, platform, workflow, jobs, imageModels, onError, onClose }: {
+export function ContextInspector({ api, platform, workspacePath, workflow, jobs, imageModels, onError, onClose }: {
   api: NexusApi
   platform: PlatformCapabilities
+  workspacePath?: string
   workflow: WorkflowDraft | null
   jobs: AppSnapshot['jobs']
   imageModels: Model[]
@@ -77,8 +78,9 @@ export function ContextInspector({ api, platform, workflow, jobs, imageModels, o
         <summary><SquareTerminal size={14} /> Terminal / system</summary>
         <input value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Allowlisted command, e.g. git status" />
         <button className="wide-button" disabled={!command.trim()} onClick={() => {
-          void api.runCommand(command).then((result) => setTerminalOutput(result.stdout || result.stderr)).catch((reason) => onError(messageOf(reason)))
+          void api.runCommand(command, workspacePath).then((result) => setTerminalOutput(result.stdout || result.stderr)).catch((reason) => onError(messageOf(reason)))
         }}>Request command approval</button>
+        <small className="tool-hint">{workspacePath ? 'Runs in the connected folder.' : 'Connect a folder to set the working directory.'}</small>
         {terminalOutput ? <pre className="terminal-output">{terminalOutput}</pre> : null}
         <div className="button-pair system-actions">
           <button disabled={!platform.systemControls} onClick={() => void api.runSystemAction('toggle-dark-mode').catch((reason) => onError(messageOf(reason)))}>Toggle appearance</button>

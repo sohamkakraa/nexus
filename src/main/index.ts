@@ -29,7 +29,8 @@ import {
   listConversations,
   openDatabase,
   setConversationArchived,
-  setConversationPinned
+  setConversationPinned,
+  setConversationWorkspace
 } from './database'
 import { diagnostic } from './diagnostics'
 import { selectAndImportFiles } from './files'
@@ -50,9 +51,10 @@ import {
   previewFeedback,
   updatePrivacySettings
 } from './privacy'
-import { createRealtimeSession, discoverProviderModels } from './providers'
+import { createRealtimeSession, discoverProviderModels, generate } from './providers'
 import { configuredProviders, providerCredentials, removeProviderKey, setProviderKey } from './secrets'
 import { generateSkill, listSkills } from './skills'
+import { selectWorkspaceDirectory } from './workspace'
 
 let mainWindow: BrowserWindow | null = null
 const models = new Map<string, Model>()
@@ -126,6 +128,16 @@ function registerIpc(): void {
       throw error
     }
   })
+  handleTrusted('models:test-response', async (_event, modelId: unknown) => {
+    if (typeof modelId !== 'string') throw new Error('Choose a model to test.')
+    const model = requireModelCapability(modelId, 'text')
+    const response = await generate(model.provider, {
+      model: model.id,
+      system: 'This is an explicit connection test. Reply with exactly: Nexus connection ready.',
+      prompt: 'Confirm the connection.'
+    })
+    return response.slice(0, 500)
+  })
   handleTrusted('conversation:create', async (_event, rawMode: unknown) => {
     const mode = rawMode === 'council' ? 'council' : 'solo'
     const now = new Date().toISOString()
@@ -150,6 +162,17 @@ function registerIpc(): void {
     await Promise.all(paths.map((path) => rm(path, { force: true }).catch(() => undefined)))
     await broadcastSnapshot()
   })
+  handleTrusted('conversation:workspace:select', async (_event, id: unknown) => {
+    const workspace = await selectWorkspaceDirectory()
+    if (!workspace) return null
+    setConversationWorkspace(conversationId(id), workspace)
+    await broadcastSnapshot()
+    return workspace
+  })
+  handleTrusted('conversation:workspace:clear', async (_event, id: unknown) => {
+    setConversationWorkspace(conversationId(id), null)
+    await broadcastSnapshot()
+  })
   handleTrusted('chat:send', async (event, rawRequest: unknown) => {
     const request = ChatRequestSchema.parse(rawRequest)
     const primary = requireModelCapability(request.primaryModel, 'text')
@@ -157,9 +180,6 @@ function registerIpc(): void {
     if (request.mode === 'council') {
       const secondary = requireModelCapability(request.secondaryModel!, 'text')
       requireReasoningSupport(secondary, request.secondaryReasoningEffort)
-      if (primary.provider === secondary.provider) {
-        throw new Error('Council mode requires one OpenAI model and one Anthropic model.')
-      }
       if (
         request.reasoningMode
         && !primary.reasoningModes?.includes(request.reasoningMode)

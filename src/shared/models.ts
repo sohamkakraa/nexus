@@ -1,6 +1,15 @@
 import type { Model, ProviderId } from './contracts'
 
 type Capability = Model['capabilities'][number]
+type AvailableModel = string | {
+  id: string
+  created?: number
+  label?: string
+  contextWindow?: number
+  maxOutputTokens?: number
+  reasoningEfforts?: Model['reasoningEfforts']
+  supportsAdaptiveThinking?: boolean
+}
 
 const OPENAI_LIMITS: Partial<Record<Capability, number>> = {
   text: 8,
@@ -10,9 +19,15 @@ const OPENAI_LIMITS: Partial<Record<Capability, number>> = {
   research: 2
 }
 
-export function curateProviderModels(provider: ProviderId, availableIds: string[]): Model[] {
-  const candidates = [...new Set(availableIds)]
-    .map((id) => classifyModel(provider, id))
+export function curateProviderModels(provider: ProviderId, availableModels: AvailableModel[]): Model[] {
+  const offerings = new Map<string, Exclude<AvailableModel, string>>()
+  for (const available of availableModels) {
+    const offering = typeof available === 'string' ? { id: available } : available
+    const existing = offerings.get(offering.id)
+    if (!existing || (offering.created ?? 0) > (existing.created ?? 0)) offerings.set(offering.id, offering)
+  }
+  const candidates = [...offerings.values()]
+    .map((offering) => classifyModel(provider, offering))
     .filter((model): model is Model => model !== null)
 
   if (provider === 'anthropic') {
@@ -53,31 +68,40 @@ function preferredCapabilityCandidates(capability: Capability, candidates: Model
   return candidates
 }
 
-function classifyModel(provider: ProviderId, id: string): Model | null {
+function classifyModel(provider: ProviderId, offering: Exclude<AvailableModel, string>): Model | null {
+  const { id, created: releasedAt, ...metadata } = offering
   const lower = id.toLowerCase()
   if (provider === 'anthropic') {
     if (!lower.startsWith('claude-')) return null
-    return model(provider, id, ['text', 'vision', 'tools'])
+    return model(provider, id, ['text', 'vision', 'tools'], releasedAt, metadata)
   }
 
-  if (/deep-research/.test(lower)) return model(provider, id, ['research'])
-  if (/transcri|whisper/.test(lower)) return model(provider, id, ['transcription'])
-  if (/realtime|gpt-live/.test(lower)) return model(provider, id, ['realtime'])
-  if (/image|dall-e/.test(lower)) return model(provider, id, ['image'])
+  if (/deep-research/.test(lower)) return model(provider, id, ['research'], releasedAt)
+  if (/transcri|whisper/.test(lower)) return model(provider, id, ['transcription'], releasedAt)
+  if (/realtime|gpt-live/.test(lower)) return model(provider, id, ['realtime'], releasedAt)
+  if (/image|dall-e/.test(lower)) return model(provider, id, ['image'], releasedAt)
   if (/embed|moderation|tts|speech|sora|search|instruct|codex/.test(lower)) return null
   if (/audio/.test(lower)) return null
-  if (/^(gpt-|o\d)/.test(lower)) return model(provider, id, ['text', 'vision', 'tools'])
+  if (/^(gpt-|o\d)/.test(lower)) return model(provider, id, ['text', 'vision', 'tools'], releasedAt)
   return null
 }
 
-function model(provider: ProviderId, id: string, capabilities: Capability[]): Model {
+function model(
+  provider: ProviderId,
+  id: string,
+  capabilities: Capability[],
+  releasedAt?: number,
+  metadata: Omit<Exclude<AvailableModel, string>, 'id' | 'created'> = {}
+): Model {
   return {
     id,
     provider,
-    label: modelLabel(id),
+    label: metadata.label ?? modelLabel(id),
     capabilities,
+    ...(releasedAt ? { releasedAt } : {}),
     // Metadata enriches an ID only after the provider reports it; it never grants or fabricates availability.
-    ...catalogMetadata(id)
+    ...catalogMetadata(provider, id),
+    ...metadata
   }
 }
 
@@ -116,6 +140,8 @@ function modelStem(model: Model): string {
 }
 
 function compareLatest(a: Model, b: Model): number {
+  const releaseOrder = (b.releasedAt ?? 0) - (a.releasedAt ?? 0)
+  if (releaseOrder) return releaseOrder
   const stemOrder = modelStem(b).localeCompare(modelStem(a), undefined, { numeric: true })
   if (stemOrder) return stemOrder
   const aSnapshot = modelStem(a) === a.id.toLowerCase() ? 0 : 1
@@ -138,9 +164,10 @@ function modelLabel(id: string): string {
     .replace(/\b(sol|terra|luna|opus|sonnet|haiku)\b/gi, (value) => value[0].toUpperCase() + value.slice(1))
 }
 
-function catalogMetadata(id: string): Partial<Model> {
+function catalogMetadata(provider: ProviderId, id: string): Partial<Model> {
   const lower = id.toLowerCase()
-  if (/^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/.test(lower)) {
+  if (provider === 'anthropic') return {}
+  if (/^gpt-5\.6(?:-(?:sol|terra|luna))?(?:-\d{4}-\d{2}-\d{2})?$/.test(lower)) {
     return {
       contextWindow: 1_050_000,
       maxOutputTokens: 128_000,

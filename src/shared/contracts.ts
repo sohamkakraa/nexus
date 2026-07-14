@@ -10,10 +10,12 @@ export const ModelSchema = z.object({
   provider: ProviderSchema,
   label: z.string(),
   capabilities: z.array(z.enum(['text', 'vision', 'image', 'realtime', 'transcription', 'tools', 'research'])),
+  releasedAt: z.number().int().nonnegative().optional(),
   contextWindow: z.number().int().positive().optional(),
   maxOutputTokens: z.number().int().positive().optional(),
   reasoningEfforts: z.array(ReasoningEffortSchema).optional(),
-  reasoningModes: z.array(z.enum(['standard', 'pro'])).optional()
+  reasoningModes: z.array(z.enum(['standard', 'pro'])).optional(),
+  supportsAdaptiveThinking: z.boolean().optional()
 })
 export type Model = z.infer<typeof ModelSchema>
 
@@ -44,6 +46,8 @@ export const ConversationSchema = z.object({
   mode: z.enum(['solo', 'council']),
   pinned: z.boolean().default(false),
   archived: z.boolean().default(false),
+  workspacePath: z.string().optional(),
+  workspaceName: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   messages: z.array(MessageSchema).default([])
@@ -146,10 +150,13 @@ export type NexusApi = {
   saveProviderKey(provider: ProviderId, key: string): Promise<void>
   removeProviderKey(provider: ProviderId): Promise<void>
   discoverModels(provider: ProviderId): Promise<Model[]>
+  testModelResponse(model: string): Promise<string>
   createConversation(mode: 'solo' | 'council'): Promise<Conversation>
   setConversationPinned(id: string, pinned: boolean): Promise<void>
   setConversationArchived(id: string, archived: boolean): Promise<void>
   deleteConversation(id: string): Promise<void>
+  selectConversationWorkspace(id: string): Promise<{ path: string; name: string } | null>
+  clearConversationWorkspace(id: string): Promise<void>
   sendMessage(request: ChatRequest): Promise<Message>
   selectFiles(): Promise<Attachment[]>
   generateImage(prompt: string, model: string): Promise<JobState>

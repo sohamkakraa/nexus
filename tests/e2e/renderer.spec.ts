@@ -77,13 +77,17 @@ test('researcher configures and edits a guided workflow safely', async () => {
     expect(await harness.page.evaluate(() => (
       window as unknown as { __nexusMockCalls: Array<{ method: string }> }
     ).__nexusMockCalls.some((call) => call.method === 'createConversation'))).toBe(true)
-    await expect(harness.page.getByRole('combobox', { name: 'Lead model' })).toHaveValue('gpt-5.6-sol')
+    await expect(harness.page.getByRole('combobox', { name: 'Lead model' })).toHaveValue('gpt-5.6-terra')
     await expect(harness.page.getByRole('combobox', { name: 'Lead reasoning effort' })).toHaveValue('high')
     await expect(harness.page.getByText('1.05M context')).toBeVisible()
     await expect(harness.page.getByRole('combobox', { name: /Challenger model/ })).toHaveValue('claude-sonnet-5')
+    await expect(harness.page.getByRole('combobox', { name: 'Challenger reasoning effort' })).toHaveValue('high')
+    await harness.page.getByRole('combobox', { name: 'Challenger model' }).selectOption('gpt-5.6-sol')
+    await expect(harness.page.getByRole('combobox', { name: 'Challenger reasoning effort' })).toHaveValue('high')
+    await harness.page.getByRole('combobox', { name: 'Challenger model' }).selectOption('claude-sonnet-5')
     await harness.page.getByRole('combobox', { name: 'Lead model' }).selectOption('claude-sonnet-5')
-    await expect(harness.page.getByRole('combobox', { name: 'Challenger model' })).toHaveValue('gpt-5.6-sol')
-    await harness.page.getByRole('combobox', { name: 'Lead model' }).selectOption('gpt-5.6-sol')
+    await expect(harness.page.getByRole('combobox', { name: 'Challenger model' })).toHaveValue('gpt-5.6-terra')
+    await harness.page.getByRole('combobox', { name: 'Lead model' }).selectOption('gpt-5.6-terra')
     await expect(harness.page.getByRole('combobox', { name: 'Challenger model' })).toHaveValue('claude-sonnet-5')
     await harness.page.getByRole('button', { name: 'Edit method' }).click()
     await harness.page.getByLabel('Workflow name').fill('Evidence review')
@@ -148,6 +152,36 @@ test('history can be pinned, archived, restored, and deleted', async () => {
   }
 })
 
+test('multiple conversations can be selected and deleted together', async () => {
+  const harness = await launchHarness('developer')
+  try {
+    await harness.page.getByRole('button', { name: 'Select', exact: true }).click()
+    await harness.page.getByRole('checkbox', { name: 'Select Existing local conversation' }).check()
+    await harness.page.getByRole('checkbox', { name: 'Select Release planning' }).check()
+    await expect(harness.page.getByText('2 selected')).toBeVisible()
+    await harness.page.locator('.bulk-history-actions').getByRole('button', { name: 'Delete' }).click()
+    await expect(harness.page.getByRole('heading', { name: 'Delete 2 conversations?' })).toBeVisible()
+    await harness.page.getByRole('button', { name: 'Delete selected' }).click()
+    await expect(harness.page.getByText('Existing local conversation', { exact: true })).toHaveCount(0)
+    await expect(harness.page.getByText('Release planning', { exact: true })).toHaveCount(0)
+  } finally {
+    await harness.close()
+  }
+})
+
+test('a conversation can connect and disconnect a local repository', async () => {
+  const harness = await launchHarness('developer')
+  try {
+    await harness.page.getByRole('button', { name: 'Connect folder' }).click()
+    await expect(harness.page.getByRole('button', { name: 'repository', exact: true })).toBeVisible()
+    await expect(harness.page.getByRole('button', { name: 'Disconnect repository' })).toBeVisible()
+    await harness.page.getByRole('button', { name: 'Disconnect repository' }).click()
+    await expect(harness.page.getByRole('button', { name: 'Connect folder' })).toBeVisible()
+  } finally {
+    await harness.close()
+  }
+})
+
 test('a connected provider key can be replaced without removing it first', async () => {
   const harness = await launchHarness('researcher')
   try {
@@ -162,13 +196,13 @@ test('a connected provider key can be replaced without removing it first', async
   }
 })
 
-test('Council stays unavailable until both providers have distinct models', async () => {
+test('a single available model falls back to working Solo mode', async () => {
   const harness = await launchHarness('privacy')
   try {
     await harness.page.getByRole('button', { name: /Start with a workflow/ }).click()
     await harness.page.getByRole('button', { name: /Council decision/ }).click()
-    await expect(harness.page.getByText('Connect OpenAI and Anthropic')).toBeVisible()
-    await expect(harness.page.getByRole('button', { name: 'Send' })).toBeDisabled()
+    await expect(harness.page.getByText('One model answers directly')).toBeVisible()
+    await expect(harness.page.getByRole('button', { name: 'Send' })).toBeEnabled()
     expect(harness.externalRequests).toEqual([])
   } finally {
     await harness.close()
@@ -182,11 +216,13 @@ test('diagnostics are explicit and mocked without network', async () => {
     await harness.page.getByRole('button', { name: /Open self-test/ }).click()
     await expect(harness.page.getByRole('heading', { name: 'Workspace diagnostics' })).toBeVisible()
     await harness.page.getByRole('button', { name: 'Inspect mapping' }).click()
-    await expect(harness.page.getByText(/2 models have explicit capability maps/)).toBeVisible()
+    await expect(harness.page.getByText(/3 models have explicit capability maps/)).toBeVisible()
     await harness.page.getByRole('button', { name: 'Request approval test' }).click()
     await expect(harness.page.getByText(/Approval completed/)).toBeVisible()
     await harness.page.getByRole('button', { name: 'Cancel running job' }).click()
     await expect(harness.page.getByText(/Cancellation requested/)).toBeVisible()
+    await harness.page.getByRole('button', { name: 'Test response' }).click()
+    await expect(harness.page.getByText(/Nexus connection ready/)).toBeVisible()
     expect(harness.externalRequests).toEqual([])
   } finally {
     await harness.close()

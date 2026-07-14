@@ -16,6 +16,7 @@ export function openDatabase(): void {
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, mode TEXT NOT NULL,
       pinned INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0,
+      workspace_path TEXT, workspace_name TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS messages (
@@ -35,6 +36,8 @@ export function openDatabase(): void {
   `)
   ensureConversationColumn('pinned', 'INTEGER NOT NULL DEFAULT 0')
   ensureConversationColumn('archived', 'INTEGER NOT NULL DEFAULT 0')
+  ensureConversationColumn('workspace_path', 'TEXT')
+  ensureConversationColumn('workspace_name', 'TEXT')
 }
 
 export function listConversations(): Conversation[] {
@@ -46,6 +49,8 @@ export function listConversations(): Conversation[] {
     mode: String(row.mode) as Conversation['mode'],
     pinned: Boolean(row.pinned),
     archived: Boolean(row.archived),
+    workspacePath: row.workspace_path ? String(row.workspace_path) : undefined,
+    workspaceName: row.workspace_name ? String(row.workspace_name) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     messages: (messageStatement.all(String(row.id)) as Array<Record<string, string>>).map(mapMessage)
@@ -53,11 +58,13 @@ export function listConversations(): Conversation[] {
 }
 
 export function insertConversation(conversation: Conversation): void {
-  db.prepare(`INSERT INTO conversations (id, title, mode, pinned, archived, created_at, updated_at)
-    VALUES (@id, @title, @mode, @pinned, @archived, @createdAt, @updatedAt)`).run({
+  db.prepare(`INSERT INTO conversations (id, title, mode, pinned, archived, workspace_path, workspace_name, created_at, updated_at)
+    VALUES (@id, @title, @mode, @pinned, @archived, @workspacePath, @workspaceName, @createdAt, @updatedAt)`).run({
       ...conversation,
       pinned: conversation.pinned ? 1 : 0,
-      archived: conversation.archived ? 1 : 0
+      archived: conversation.archived ? 1 : 0,
+      workspacePath: conversation.workspacePath ?? null,
+      workspaceName: conversation.workspaceName ?? null
     })
 }
 
@@ -92,6 +99,15 @@ export function setConversationArchived(id: string, archived: boolean): void {
   db.prepare('UPDATE conversations SET archived = ?, pinned = CASE WHEN ? = 1 THEN 0 ELSE pinned END, updated_at = ? WHERE id = ?').run(
     archived ? 1 : 0,
     archived ? 1 : 0,
+    new Date().toISOString(),
+    id
+  )
+}
+
+export function setConversationWorkspace(id: string, workspace: { path: string; name: string } | null): void {
+  db.prepare('UPDATE conversations SET workspace_path = ?, workspace_name = ?, updated_at = ? WHERE id = ?').run(
+    workspace?.path ?? null,
+    workspace?.name ?? null,
     new Date().toISOString(),
     id
   )
@@ -210,7 +226,10 @@ function mapMessage(row: Record<string, string>): Message {
   }
 }
 
-function ensureConversationColumn(name: 'pinned' | 'archived', definition: string): void {
+function ensureConversationColumn(
+  name: 'pinned' | 'archived' | 'workspace_path' | 'workspace_name',
+  definition: string
+): void {
   const columns = db.pragma('table_info(conversations)') as Array<{ name: string }>
   if (!columns.some((column) => column.name === name)) {
     db.exec(`ALTER TABLE conversations ADD COLUMN ${name} ${definition}`)

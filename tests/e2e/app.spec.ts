@@ -26,7 +26,7 @@ test('opens the production Electron Council workspace', async () => {
       await expect(page.getByRole('heading', { name: 'Start with a question.' })).toBeVisible()
       await page.getByRole('button', { name: 'Connections' }).click()
       await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
-      await expect(page.getByText(/Connecting checks the provider/)).toBeVisible()
+      await expect(page.getByText(/currently available models/)).toBeVisible()
       await page.getByRole('button', { name: 'Close connections' }).click()
     })
     await test.step('create work through the trusted preload', async () => {
