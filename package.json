@@ -133,7 +133,7 @@
     "playwright": "^1.61.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.63.0",
-    "vite": "^7.3.6",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }
 }
