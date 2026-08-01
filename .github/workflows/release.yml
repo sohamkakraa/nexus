@@ -224,7 +224,7 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: release-assets/*
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: Nexus-${{ needs.verify-tag.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ env.RELEASE_SIGNING_STATUS }}
           path: release-assets/*
@@ -282,7 +282,7 @@ jobs:
             release-assets/SHA256SUMS.txt
             release-assets/*-sbom.cdx.json
       - name: Retain release candidate
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Nexus-${{ needs.verify-tag.outputs.version }}-${{ steps.manifest.outputs.publishable == 'true' && steps.manifest.outputs.channel || 'unsigned-prerelease-candidate' }}
           path: |
