@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/marketing/plan.mjs marketing-plan.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: marketing-plan-dry-run
           path: marketing-plan.json
